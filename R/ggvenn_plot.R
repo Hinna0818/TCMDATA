@@ -10,8 +10,8 @@
 #' @param use.color.as.text Logical; if TRUE, use fill color as set name text color.
 #' @param name.size Font size for set names.
 #' @param text.size Font size for intersection counts.
-#' @param stroke.color Circle border color.
-#' @param stroke.size Circle border thickness.
+#' @param stroke.color Circle border color. Default is 'black'.
+#' @param stroke.size Circle border thickness. Default is 0.6.
 #' @param show.percentage Logical; whether to show percentages instead of raw counts.
 #' @param show.elements Logical; whether to display individual elements in each region.
 #' @param digits Number of decimal places for percentage display.
@@ -28,8 +28,8 @@ ggvenn_plot <- function(venn_df,
                           use.color.as.text = TRUE,
                           name.size = 5,
                           text.size = 4,
-                          stroke.color = "white",
-                          stroke.size = 0.8,
+                          stroke.color = "black",
+                          stroke.size = 0.6,
                           show.percentage = FALSE,
                           show.elements = FALSE,
                           digits = 1,
