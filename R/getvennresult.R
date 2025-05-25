@@ -6,7 +6,7 @@
 #'
 #' @return A data.frame with intersection combinations and their gene lists
 #' @export
-get_venn_result <- function(venn_df,
+getvennresult <- function(venn_df,
                             col_names = NULL,
                             drop_empty = TRUE) {
   
