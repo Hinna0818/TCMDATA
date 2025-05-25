@@ -22,6 +22,9 @@ gglollipop <- function(
     text.size = 10,
     text.width = 35,
     color = "RdBu",
+    line.type = "solid",
+    line.col = "grey60",
+    line.size = 0.9,
     plot_title = NULL) 
   {
   
@@ -55,7 +58,10 @@ gglollipop <- function(
     df,
     aes(RichFactor, stats::reorder(Description, RichFactor))
   ) +
-    geom_segment(aes(xend = 0, yend = Description)) +
+    geom_segment(aes(xend = 0, yend = Description),
+                 color = line.col,
+                 linetype = line.type,
+                 size = line.size) +
     geom_point(aes(color = p.adjust, size = Count)) +
     geom_text(
       aes(label = Count, x = RichFactor + max(RichFactor) * 0.03),  
