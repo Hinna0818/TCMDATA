@@ -61,7 +61,7 @@ gglollipop <- function(
     geom_segment(aes(xend = 0, yend = Description),
                  color = line.col,
                  linetype = line.type,
-                 size = line.size) +
+                 linewidth = line.size) +
     geom_point(aes(color = p.adjust, size = Count)) +
     geom_text(
       aes(label = Count, x = RichFactor + max(RichFactor) * 0.03),  
