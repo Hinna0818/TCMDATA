@@ -13,7 +13,7 @@
 #'   \item One logical column per input set indicating presence (TRUE/FALSE) of each element.
 #' }
 #'
-#'
+#' @export
 getvenndata <- function(..., set_names = NULL) {
   
   input_sets <- list(...)
