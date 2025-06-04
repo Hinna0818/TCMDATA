@@ -18,6 +18,10 @@
 #' @param expand_ratio Plot margin expansion ratio for aesthetics.
 #'
 #' @return A \code{ggplot} object representing the Venn diagram.
+#' 
+#' @importFrom ggvenn ggvenn
+#' @importFrom ggplot2 scale_x_continuous expansion
+#' @importFrom dplyr setdiff
 #' @export
 #' 
 ggvenn_plot <- function(venn_df,
@@ -44,7 +48,7 @@ ggvenn_plot <- function(venn_df,
   }
   
   if (!all(col_names %in% colnames(venn_df))) {
-    stop("The following columns are not in venn_df: ", paste(setdiff(col_names, colnames(venn_df)), collapse = ", "))
+    stop("The following columns are not in venn_df: ", paste(dplyr::setdiff(col_names, colnames(venn_df)), collapse = ", "))
   }
   
   # check whether all cols selected are logical
