@@ -10,7 +10,7 @@
 #'
 #' @import ggplot2
 #' @importFrom RColorBrewer brewer.pal
-#' @importFrom stringr str_wrap
+#' @importFrom yulab.utils str_wrap
 #' @importFrom dplyr arrange slice_head %>% 
 #' @importFrom tidyr drop_na
 #' 
@@ -28,11 +28,6 @@ gglollipop <- function(
     plot_title = NULL) 
   {
   
-  library(ggplot2)
-  library(RColorBrewer)
-  library(stringr)
-  library(dplyr)
-  
   if (inherits(enrich_obj, "enrichResult")) {
     df <- enrich_obj@result %>% tidyr::drop_na()
   } else if (is.data.frame(enrich_obj)) {
@@ -47,18 +42,21 @@ gglollipop <- function(
   }
   
   df <- df %>%
-    arrange(p.adjust) %>%
+    arrange(.data$p.adjust) %>%
     slice_head(n = top_n)
   
   df$RichFactor <- df$RichFactor %>% round(digits = 2)
   
-  label_wrap <- function(labels) str_wrap(labels, width = text.width)
+  label_wrap <- function(labels) yulab.utils::str_wrap(labels, width = text.width)
+  
+  x_sym <- rlang::sym("RichFactor")
+  y_sym <- rlang::sym("Description")
+  y_reorder <- rlang::expr(stats::reorder(!!y_sym, !!x_sym))
   
   p <- ggplot(
     df,
-    aes(RichFactor, stats::reorder(Description, RichFactor))
-  ) +
-    geom_segment(aes(xend = 0, yend = Description),
+    aes(x = !!x_sym, y = !!y_reorder)) +
+    geom_segment(aes(xend = 0, yend = !!y_reorder),
                  color = line.col,
                  linetype = line.type,
                  linewidth = line.size) +
