@@ -9,7 +9,15 @@ Depends:
 Imports:
     dplyr,
     rlang,
-    tidyr
+    tidyr,
+    yulab.utils,
+    igraph,
+    ggplot2,
+    cols4all,
+    ggsankey,
+    RColorBrewer,
+    aplotExtra,
+    ggvenn
 License: Artistic-2.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
