@@ -5,10 +5,10 @@
 #' @param score_cutoff Minimum edge score to keep. Default is 0.7.
 #'
 #' @return A subgraph of the original PPI network
+#' @importFrom igraph degree E subgraph_from_edges vcount induced_subgraph
+#' @export
 
 ppi_subset <- function(ppi_obj, n = NULL, score_cutoff = 0.7) {
-  
-  library(igraph)
   
   stopifnot(inherits(ppi_obj, "igraph"))
   
@@ -17,7 +17,8 @@ ppi_subset <- function(ppi_obj, n = NULL, score_cutoff = 0.7) {
     stop("Edges must have a 'score' attribute.")
   }
   
-  ppi_filtered <- subgraph.edges(ppi_obj, eids = E(ppi_obj)[score >= score_cutoff], delete.vertices = TRUE)
+  score <- E(ppi_obj)$score
+  ppi_filtered <- subgraph_from_edges(ppi_obj, eids = E(ppi_obj)[score >= score_cutoff], delete.vertices = TRUE)
   
   if (vcount(ppi_filtered) == 0) {
     warning("No nodes left after edge score filtering.")
@@ -49,7 +50,8 @@ ppi_subset <- function(ppi_obj, n = NULL, score_cutoff = 0.7) {
 #'  - `"invp"`: use `1 / p.adjust`
 #'
 #' @return A data frame with genes in rows and selected enrichment terms in columns. Values represent either binary membership or weighted scores.
-#'
+#' @importFrom dplyr arrange slice_head filter
+#' @export
 
 getPieData <- function(
     enrich_obj, 
@@ -62,7 +64,7 @@ getPieData <- function(
   
   # 1. extract top n pathways
   enrich_df <- enrich_obj@result %>%
-    dplyr::arrange(p.adjust) %>%
+    dplyr::arrange(.data$p.adjust) %>%
     dplyr::slice_head(n = top_n)
   
   # 2. extract the name of term and gene id
@@ -96,7 +98,8 @@ getPieData <- function(
   
   # 4. filter the nodes in ppi
   pie_data <- score_df %>%
-    dplyr::filter(name %in% ppi_genes)
+    dplyr::filter(.data$name %in% ppi_genes)
   
   return(pie_data)
 }
+
