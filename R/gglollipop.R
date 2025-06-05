@@ -9,7 +9,6 @@
 #' @return A `ggplot` object representing the lollipop plot.
 #'
 #' @import ggplot2
-#' @import rlang
 #' @importFrom RColorBrewer brewer.pal
 #' @importFrom yulab.utils str_wrap
 #' @importFrom dplyr arrange slice_head %>% 
