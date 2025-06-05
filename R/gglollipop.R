@@ -18,7 +18,6 @@
 #' @import ggplot2
 #' @importFrom enrichplot dotplot
 #' @importFrom RColorBrewer brewer.pal
-#' @importFrom dplyr %>%
 #'
 #' @export
 
