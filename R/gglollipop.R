@@ -9,10 +9,12 @@
 #' @return A `ggplot` object representing the lollipop plot.
 #'
 #' @import ggplot2
+#' @import rlang
 #' @importFrom RColorBrewer brewer.pal
 #' @importFrom yulab.utils str_wrap
 #' @importFrom dplyr arrange slice_head %>% 
 #' @importFrom tidyr drop_na
+#' @importFrom rlang sym expr !!
 #' 
 #' @export
 #' 
@@ -49,9 +51,14 @@ gglollipop <- function(
   
   label_wrap <- function(labels) yulab.utils::str_wrap(labels, width = text.width)
   
+  RichFactor <- Count <- p.adjust <- Description <- NULL  
+  x_offset <- max(df$RichFactor, na.rm = TRUE) * 0.03
+  
   x_sym <- rlang::sym("RichFactor")
   y_sym <- rlang::sym("Description")
   y_reorder <- rlang::expr(stats::reorder(!!y_sym, !!x_sym))
+  pval_sym <- rlang::sym("p.adjust")
+  count_sym <- rlang::sym("Count")
   
   p <- ggplot(
     df,
@@ -60,9 +67,9 @@ gglollipop <- function(
                  color = line.col,
                  linetype = line.type,
                  linewidth = line.size) +
-    geom_point(aes(color = p.adjust, size = Count)) +
+    geom_point(aes(color = !!pval_sym, size = !!count_sym)) +
     geom_text(
-      aes(label = Count, x = RichFactor + max(RichFactor) * 0.03),  
+      aes(label = !!count_sym, x = RichFactor + x_offset),  
       size = text.size / 2,
       color = "black"
     ) + 
