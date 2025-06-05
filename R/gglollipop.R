@@ -1,94 +1,96 @@
-#' @param enrich_obj An enrichment result object of class `enrichResult` from clusterProfiler 
-#' or a `data.frame` containing at least the columns: `Description`, `RichFactor`, `p.adjust`, and `Count`.
-#' @param top_n Integer. Number of top enriched terms to display. Default is 10.
-#' @param text.size Numeric. Font size of axis text and title. Default is 10.
-#' @param text.width Integer. Line wrapping width for y-axis labels. Default is 35 characters.
-#' @param color Character. Color palette name from RColorBrewer to use for bubble color. Default is "RdBu".
-#' @param plot_title Character. Optional title for the plot. Default is NULL (no title).
+#' Lollipop Plot for Enrichment Results
 #'
-#' @return A `ggplot` object representing the lollipop plot.
+#' @param enrich_obj An enrichment result object from clusterProfiler. 
+#' @param x Character. The variable used for the x-axis. Default is `"RichFactor"`.
+#' @param top_n Integer. Number of top enriched terms to display. Default is 10.
+#' @param orderBy Character. Variable used to order the y-axis terms. Default is `"x"`.
+#' @param text.col Character. Colors for text. Default is `black`.
+#' @param text.size Numeric. Font size for axis text and title. Default is 10.
+#' @param palette Character. Color palette name from `RColorBrewer` to use for dot color. Default is `"RdBu"`.
+#' @param line.col Character. Color of the segment lines. Default is `"grey60"`.
+#' @param line.type Character. Line type for segments. Default is `"solid"`.
+#' @param line.size Numeric. Line width for segments. Default is 0.9.
+#' @param plot_title Character. Optional plot title. Default is `NULL`.
+#' @param show_count Logical. Whether to display the count value as a text label next to each dot. Default is TRUE
+#'
+#' @return A `ggplot` object showing a lollipop-style enrichment plot.
 #'
 #' @import ggplot2
+#' @importFrom enrichplot dotplot
 #' @importFrom RColorBrewer brewer.pal
-#' @importFrom yulab.utils str_wrap
-#' @importFrom dplyr arrange slice_head %>% 
-#' @importFrom tidyr drop_na
-#' @importFrom rlang sym expr !!
-#' 
+#' @importFrom dplyr %>%
+#'
 #' @export
-#' 
-gglollipop <- function(
-    enrich_obj,
-    top_n = 10,
-    text.size = 10,
-    text.width = 35,
-    color = "RdBu",
-    line.type = "solid",
-    line.col = "grey60",
-    line.size = 0.9,
-    plot_title = NULL) 
-  {
+
+gglollipop <- function(enrich_obj,
+                               x = "RichFactor",
+                               top_n = 10,
+                               orderBy = NULL,
+                               text.col = "black",
+                               text.size = 8,
+                               text.width = 35,
+                               palette = "RdBu",
+                               line.col = "grey60",
+                               line.type = "solid",
+                               line.size = 0.9,
+                               plot_title = NULL,
+                               show_count = TRUE,
+                               ...) {
   
-  if (inherits(enrich_obj, "enrichResult")) {
-    df <- enrich_obj@result %>% tidyr::drop_na()
-  } else if (is.data.frame(enrich_obj)) {
-    df <- enrich_obj %>% tidyr::drop_na()
-  } else {
-    stop("Input must be an enrichResult object or a data.frame.")
+  if (is.null(orderBy)) {
+    orderBy <- "x" 
   }
   
-  required_cols <- c("Description", "RichFactor", "p.adjust", "Count")
-  if (!all(required_cols %in% colnames(df))) {
-    stop(paste("Data must contain the following columns:", paste(required_cols, collapse = ", ")))
-  }
+  p <- enrichplot::dotplot(enrich_obj,
+                           showCategory = top_n,
+                           x = x,
+                           orderBy = orderBy,
+                           ...)
   
-  df <- df %>%
-    arrange(.data$p.adjust) %>%
-    slice_head(n = top_n)
+  df_plot <- p$data
+  x_offset <- max(df_plot[[x]], na.rm = TRUE) * 0.06
+  n_color <- RColorBrewer::brewer.pal.info[palette, "maxcolors"]
   
-  df$RichFactor <- df$RichFactor %>% round(digits = 2)
+  ## remove former color_scale
+  p$scales$scales <- Filter(function(s) {
+    !"ScaleContinuous" %in% class(s) || s$aesthetics != "fill"
+  }, p$scales$scales)
   
-  label_wrap <- function(labels) yulab.utils::str_wrap(labels, width = text.width)
-  
-  RichFactor <- Count <- p.adjust <- Description <- NULL  
-  x_offset <- max(df$RichFactor, na.rm = TRUE) * 0.03
-  
-  x_sym <- rlang::sym("RichFactor")
-  y_sym <- rlang::sym("Description")
-  y_reorder <- rlang::expr(stats::reorder(!!y_sym, !!x_sym))
-  pval_sym <- rlang::sym("p.adjust")
-  count_sym <- rlang::sym("Count")
-  
-  p <- ggplot(
-    df,
-    aes(x = !!x_sym, y = !!y_reorder)) +
-    geom_segment(aes(xend = 0, yend = !!y_reorder),
+  p <- p +
+    geom_segment(data = df_plot,
+                 aes(x = 0, xend = .data[[x]], 
+                     y = .data[["Description"]], yend = .data[["Description"]]),
                  color = line.col,
                  linetype = line.type,
-                 linewidth = line.size) +
-    geom_point(aes(color = !!pval_sym, size = !!count_sym)) +
-    geom_text(
-      aes(label = !!count_sym, x = RichFactor + x_offset),  
-      size = text.size / 2,
-      color = "black"
-    ) + 
-    scale_color_gradientn(
-      colours = RColorBrewer::brewer.pal(8, color),
+                 linewidth = line.size,
+                 inherit.aes = FALSE) +
+    scale_fill_gradientn(
+      colours = RColorBrewer::brewer.pal(n_color, palette),
       trans = "log10",
-      guide = guide_colorbar(reverse = TRUE, order = 1)
-    ) +
-    scale_size_continuous(range = c(2, 10)) +
+      guide = guide_colorbar(reverse = TRUE)
+    )
+  
+  if (show_count){
+    p <- p + geom_text(data = df_plot,
+              aes(x = .data[[x]] + x_offset, 
+                  y = .data[["Description"]], 
+                  label = .data[["Count"]]),
+              size = text.size / 2,
+              color = text.col,
+              inherit.aes = FALSE)
+  }
+  
+  p <- p + 
     theme_bw() +
     theme(
-      axis.text.x = element_text(size = text.size, colour = "black", vjust = 1),
-      axis.text.y = element_text(size = text.size, colour = "black", hjust = 1),
-      axis.title = element_text(margin = margin(10, 5, 0, 0), color = "black", size = text.size),
+      axis.text.x = element_text(size = text.size),
+      axis.text.y = element_text(size = text.size),
+      axis.title = element_text(size = text.size + 1),
       plot.title = element_text(size = text.size + 2, face = "bold", hjust = 0.5)
     ) +
-    xlab("Rich Factor") +
-    ylab(NULL) +
-    ggtitle(plot_title) +
-    scale_y_discrete(labels = label_wrap)
+    ggtitle(plot_title)
+  
+  p$layers <- rev(p$layers)
   
   return(p)
 }
