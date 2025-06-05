@@ -1,6 +1,6 @@
 #' Lollipop Plot for Enrichment Results
 #'
-#' @param enrich_obj An enrichment result object from clusterProfiler. 
+#' @param enrich_obj An enrichment result object from clusterProfiler.
 #' @param x Character. The variable used for the x-axis. Default is `"RichFactor"`.
 #' @param top_n Integer. Number of top enriched terms to display. Default is 10.
 #' @param orderBy Character. Variable used to order the y-axis terms. Default is `"x"`.
@@ -35,29 +35,29 @@ gglollipop <- function(enrich_obj,
                                plot_title = NULL,
                                show_count = TRUE,
                                ...) {
-  
+
   if (is.null(orderBy)) {
-    orderBy <- "x" 
+    orderBy <- "x"
   }
-  
+
   p <- enrichplot::dotplot(enrich_obj,
                            showCategory = top_n,
                            x = x,
                            orderBy = orderBy,
                            ...)
-  
+
   df_plot <- p$data
   x_offset <- max(df_plot[[x]], na.rm = TRUE) * 0.06
   n_color <- RColorBrewer::brewer.pal.info[palette, "maxcolors"]
-  
+
   ## remove former color_scale
   p$scales$scales <- Filter(function(s) {
     !"ScaleContinuous" %in% class(s) || s$aesthetics != "fill"
   }, p$scales$scales)
-  
+
   p <- p +
     geom_segment(data = df_plot,
-                 aes(x = 0, xend = .data[[x]], 
+                 aes(x = 0, xend = .data[[x]],
                      y = .data[["Description"]], yend = .data[["Description"]]),
                  color = line.col,
                  linetype = line.type,
@@ -68,18 +68,20 @@ gglollipop <- function(enrich_obj,
       trans = "log10",
       guide = guide_colorbar(reverse = TRUE)
     )
-  
+
+  p$layers <- rev(p$layers)
+
   if (show_count){
     p <- p + geom_text(data = df_plot,
-              aes(x = .data[[x]] + x_offset, 
-                  y = .data[["Description"]], 
+              aes(x = .data[[x]] + x_offset,
+                  y = .data[["Description"]],
                   label = .data[["Count"]]),
               size = text.size / 2,
               color = text.col,
               inherit.aes = FALSE)
   }
-  
-  p <- p + 
+
+  p <- p +
     theme_bw() +
     theme(
       axis.text.x = element_text(size = text.size),
@@ -88,8 +90,6 @@ gglollipop <- function(enrich_obj,
       plot.title = element_text(size = text.size + 2, face = "bold", hjust = 0.5)
     ) +
     ggtitle(plot_title)
-  
-  p$layers <- rev(p$layers)
-  
+
   return(p)
 }
