@@ -11,6 +11,7 @@ Imports:
     rlang,
     tidyr,
     yulab.utils,
+    enrichplot,
     igraph,
     ggplot2,
     cols4all,
