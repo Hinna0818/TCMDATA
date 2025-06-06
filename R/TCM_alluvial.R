@@ -10,7 +10,6 @@
 #' @return A `ggplot` object representing the alluvial diagram.
 #'
 #' @import ggplot2
-#' @importFrom dplyr %>%
 #' @importFrom cols4all c4a
 #' @importFrom ggsankey make_long geom_alluvial geom_alluvial_text theme_sankey
 #'
@@ -23,10 +22,6 @@ TCM_alluvial <- function(data,
                        palette = "rainbow_wh_rd",
                        ...) {
   
-  library(ggplot2)
-  library(cols4all)
-  library(dplyr)
-  
   stopifnot(is.data.frame(data), ncol(data) >= 2)
   
   layer_cols <- colnames(data)
@@ -37,12 +32,12 @@ TCM_alluvial <- function(data,
   names(node_colors) <- unique(df_long$node)
   
   p <- ggplot(df_long,
-              aes(x = x,
-                  next_x = next_x,
-                  node = node,
-                  next_node = next_node,
-                  fill = node,
-                  label = node)) +
+              aes(x = .data[["x"]],
+                  next_x = .data[["next_x"]],
+                  node = .data[["node"]],
+                  next_node = .data[["next_node"]],
+                  fill = .data[["node"]],
+                  label = .data[["node"]])) +
     ggsankey::geom_alluvial(flow.alpha = flow.alpha, node.color = NA, show.legend = FALSE) +
     ggsankey::geom_alluvial_text(size = text.size, 
                                  color = "black", 
