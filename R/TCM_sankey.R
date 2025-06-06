@@ -9,11 +9,10 @@
 #' @param palette Character. Name of the color palette to use from `cols4all::c4a_pals()`.
 #'                Default is `"rainbow_wh_rd"`.
 #'
-#' @return A `ggplot` object representing the Sankey diagram.
+#' @return A `ggplot` object.
 #'
 #' @import ggplot2
-#' @importFrom dplyr %>%
-#' @importFrom cols4all c4a c4a_pals
+#' @importFrom cols4all c4a
 #' @importFrom ggsankey make_long geom_sankey geom_sankey_text theme_sankey
 #'
 #' @export
@@ -25,9 +24,6 @@ TCM_sankey <- function(data,
                        palette = "rainbow_wh_rd",
                        ...) {
   
-  library(ggplot2)
-  library(cols4all)
-  library(dplyr)
   
   stopifnot(is.data.frame(data), ncol(data) >= 2)
   
@@ -39,13 +35,14 @@ TCM_sankey <- function(data,
   names(node_colors) <- unique(df_long$node)
   
   p <- ggplot(df_long,
-              aes(x = x,
-                  next_x = next_x,
-                  node = node,
-                  next_node = next_node,
-                  fill = node)) +
+              aes(x = .data[["x"]],
+                  next_x = .data[["next_x"]],
+                  node = .data[["node"]],
+                  next_node = .data[["next_node"]],
+                  fill = .data[["node"]])) +
     ggsankey::geom_sankey(flow.alpha = flow.alpha, node.color = NA, show.legend = FALSE) +
-    ggsankey::geom_sankey_text(aes(label = node),
+    ggsankey::geom_sankey_text(
+                     aes(label = .data[["node"]]),
                      size = text.size,
                      hjust = text.position,
                      color = "black",
@@ -58,4 +55,5 @@ TCM_sankey <- function(data,
                                      hjust = 0.5))
   
   return(p)
+  
 }
