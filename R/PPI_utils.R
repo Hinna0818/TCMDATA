@@ -9,29 +9,30 @@
 #' @export
 
 ppi_subset <- function(ppi_obj, n = NULL, score_cutoff = 0.7) {
-  
+
   stopifnot(inherits(ppi_obj, "igraph"))
-  
+  score <- E(ppi_obj)$score
+
   # edge score filter
-  if (is.null(E(ppi_obj)$score)) {
+  if (is.null(score)) {
     stop("Edges must have a 'score' attribute.")
   }
-  
-  score <- E(ppi_obj)$score
-  ppi_filtered <- subgraph_from_edges(ppi_obj, eids = E(ppi_obj)[score >= score_cutoff], delete.vertices = TRUE)
-  
+
+  ppi_filtered <- igraph::subgraph_from_edges(ppi_obj, eids = E(ppi_obj)[score >= score_cutoff], delete.vertices = TRUE)
+
   if (vcount(ppi_filtered) == 0) {
     warning("No nodes left after edge score filtering.")
     return(ppi_filtered)
   }
-  
+
   # degree filter
   if (!is.null(n)){
-    deg <- igraph::degree(ppi_filtered)
+    deg <- igraph::degree(ppi_filtered, mode = "all")
+    deg <- deg[!is.na(deg)]
     top_nodes <- names(sort(deg, decreasing = TRUE))[1:min(n, length(deg))]
     ppi_filtered <- igraph::induced_subgraph(ppi_filtered, vids = top_nodes)
   }
-  
+
   return(ppi_filtered)
 }
 
@@ -54,33 +55,33 @@ ppi_subset <- function(ppi_obj, n = NULL, score_cutoff = 0.7) {
 #' @export
 
 getPieData <- function(
-    enrich_obj, 
-    ppi_genes, 
-    top_n = 5, 
-    use_weight = FALSE, 
+    enrich_obj,
+    ppi_genes,
+    top_n = 5,
+    use_weight = FALSE,
     weight_scale = c("logp", "invp")) {
-  
+
   stopifnot(inherits(enrich_obj, "enrichResult"))
-  
+
   # 1. extract top n pathways
   enrich_df <- enrich_obj@result %>%
     dplyr::arrange(.data$p.adjust) %>%
     dplyr::slice_head(n = top_n)
-  
+
   # 2. extract the name of term and gene id
   enrich_terms <- enrich_df$Description
   gene_lists <- strsplit(enrich_df$geneID, "/")
   names(gene_lists) <- enrich_terms
-  
+
   all_genes <- unique(unlist(gene_lists))
-  
+
   # 3. set gene-term df
   score_df <- data.frame(name = all_genes, stringsAsFactors = FALSE)
-  
+
   for (i in seq_along(enrich_terms)) {
     term <- enrich_terms[i]
     genes_in_term <- gene_lists[[i]]
-    
+
     if (use_weight) {
       if (weight_scale[1] == "logp") {
         score_df[[term]] <- ifelse(score_df$name %in% genes_in_term,
@@ -95,11 +96,15 @@ getPieData <- function(
       score_df[[term]] <- as.integer(score_df$name %in% genes_in_term)
     }
   }
-  
+
   # 4. filter the nodes in ppi
   pie_data <- score_df %>%
     dplyr::filter(.data$name %in% ppi_genes)
-  
+
+  if (nrow(pie_data) == 0) {
+    warning("No overlapping genes found between enrichment results and PPI network.")
+  }
+
   return(pie_data)
 }
 
