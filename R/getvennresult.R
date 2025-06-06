@@ -5,7 +5,6 @@
 #' @param drop_empty Logical; whether to drop combinations with 0 genes
 #'
 #' @return A data.frame with intersection combinations and their gene lists
-#' @export
 getvennresult <- function(venn_df,
                             col_names = NULL,
                             drop_empty = TRUE) {
