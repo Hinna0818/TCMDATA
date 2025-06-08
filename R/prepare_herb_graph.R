@@ -44,6 +44,9 @@ prepare_herb_graph <- function(
   if (compute_metrics) {
     V(g)$degree <- igraph::degree(g, mode = "all")
     V(g)$centrality <- igraph::eigen_centrality(g)$vector
+    V(g)$betweenness <- igraph::betweenness(g, directed = TRUE)
+    V(g)$closeness <- igraph::closeness(g, mode = "all")
+    V(g)$pagerank <- igraph::page_rank(g)$vector
   }
 
   node_names <- V(g)$name
