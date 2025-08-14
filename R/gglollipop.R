@@ -17,7 +17,7 @@
 #'
 #' @import ggplot2
 #' @importFrom ggrepel geom_text_repel
-#' @importFrom RColorBrewer brewer.pal.info
+#' @importFrom RColorBrewer brewer.pal.info brewer.pal
 #' @importFrom enrichplot dotplot
 #' @importFrom rlang .data
 #'
@@ -49,7 +49,6 @@ gglollipop <- function(enrich_obj,
                            ...)
 
   df_plot <- p$data
-  # x_offset <- max(df_plot[[x]], na.rm = TRUE) * 0.06
   n_color <- RColorBrewer::brewer.pal.info[palette, "maxcolors"]
 
   ## remove former color_scale
