@@ -8,20 +8,20 @@
 getvennresult <- function(venn_df,
                             col_names = NULL,
                             drop_empty = TRUE) {
-  
+
   if (is.null(col_names)) {
     col_names <- colnames(venn_df)[-1]
   }
-  
+
   if (!all(sapply(venn_df[col_names], is.logical))) {
     stop("All selected columns must be logical (TRUE/FALSE).")
   }
-  
-  gene_col <- venn_df[[1]]  
-  
+
+  gene_col <- venn_df[[1]]
+
   combos <- expand.grid(rep(list(c(TRUE, FALSE)), length(col_names)))
   colnames(combos) <- col_names
-  
+
   results <- apply(combos, 1, function(mask) {
     filter <- Reduce(`&`, Map(function(col, val) venn_df[[col]] == val, col_names, mask))
     matched_genes <- gene_col[filter]
@@ -33,13 +33,13 @@ getvennresult <- function(venn_df,
       Genes = paste(matched_genes, collapse = ", ")
     )
   })
-  
+
   df <- do.call(rbind, results)
   rownames(df) <- NULL
-  
+
   if (drop_empty) {
     df <- subset(df, Gene_Count > 0)
   }
-  
+
   return(df)
 }

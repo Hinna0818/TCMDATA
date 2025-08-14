@@ -62,6 +62,7 @@ getPieData <- function(
     weight_scale = c("logp", "invp")) {
 
   stopifnot(inherits(enrich_obj, "enrichResult"))
+  weight_scale <- match.arg(weight_scale)
 
   # 1. extract top n pathways
   enrich_df <- enrich_obj@result %>%

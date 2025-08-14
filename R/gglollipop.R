@@ -16,8 +16,10 @@
 #' @return A `ggplot` object showing a lollipop-style enrichment plot.
 #'
 #' @import ggplot2
+#' @importFrom ggrepel geom_text_repel
+#' @importFrom RColorBrewer brewer.pal.info
 #' @importFrom enrichplot dotplot
-#' @importFrom RColorBrewer brewer.pal
+#' @importFrom rlang .data
 #'
 #' @export
 
@@ -47,7 +49,7 @@ gglollipop <- function(enrich_obj,
                            ...)
 
   df_plot <- p$data
-  x_offset <- max(df_plot[[x]], na.rm = TRUE) * 0.06
+  # x_offset <- max(df_plot[[x]], na.rm = TRUE) * 0.06
   n_color <- RColorBrewer::brewer.pal.info[palette, "maxcolors"]
 
   ## remove former color_scale
@@ -72,12 +74,16 @@ gglollipop <- function(enrich_obj,
   p$layers <- rev(p$layers)
 
   if (show_count){
-    p <- p + geom_text(data = df_plot,
-              aes(x = .data[[x]] + x_offset,
+    p <- p + geom_text_repel(data = df_plot,
+              aes(x = .data[[x]],
                   y = .data[["Description"]],
                   label = .data[["Count"]]),
               size = text.size / 2,
               color = text.col,
+              hjust = 0,
+              direction = "x",
+              nudge_x = 0.025 * max(df_plot[[x]], na.rm = TRUE),
+              segment.color = NA,
               inherit.aes = FALSE)
   }
 
