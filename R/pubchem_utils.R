@@ -49,7 +49,7 @@ getcid <- function(compound,
 #' @importFrom dplyr mutate
 #' @importFrom tidyr unnest_wider
 #' @importFrom rlang .data
-getprop <- function(cid, 
+getprops <- function(cid, 
                     properties = c(
                       "MolecularFormula",
                       "MolecularWeight",
