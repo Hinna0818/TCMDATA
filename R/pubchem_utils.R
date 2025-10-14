@@ -45,7 +45,7 @@ getcid <- function(compound,
 #' @param cid Integer/numeric/character vector of PubChem CIDs.
 #' @param properties Character vector of PubChem property keys to request.
 #' @importFrom purrr slowly rate_delay insistently rate_backoff possibly map
-#' @importFrom PubChemR pc_prop
+#' @importFrom webchem pc_prop
 #' @importFrom dplyr mutate
 #' @importFrom tidyr unnest_wider
 #' @importFrom rlang .data
@@ -60,7 +60,7 @@ getprops <- function(cid,
                     ...){
   cid <- na.omit(cid)
   slow_prop <- purrr::slowly(
-    function(cid) pc_prop(cid, properties = properties, ...),
+    function(cid) webchem::pc_prop(cid, properties = properties, ...),
     rate = purrr::rate_delay(pause = 0.25)
   )
   prop_retry <- purrr::insistently(
@@ -74,19 +74,4 @@ getprops <- function(cid,
     dplyr::mutate(prop = purrr::map(.data$cid, prop_safe)) |>
     tidyr::unnest_wider(prop)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
