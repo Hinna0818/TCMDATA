@@ -256,8 +256,8 @@ gocircle_plot <- function(
     title_gp = text_gp)
   
   lgd_list_vertical <- ComplexHeatmap::packLegend(category_legend, updown_legend)
-  ComplexHeatmap::draw(x = grid::unit(0.51, "npc"), y = grid::unit(0.5, "npc"), lgd_list_vertical, just = c("right"))
-  ComplexHeatmap::draw(padj_legend, x = grid::unit(0.53, "npc"), y = grid::unit(0.5, "npc"), just = c("left"))
+  ComplexHeatmap::draw(x = grid::unit(0.43, "npc"), y = grid::unit(0.5, "npc"), lgd_list_vertical, just = c("left"))
+  ComplexHeatmap::draw(padj_legend, x = grid::unit(0.51, "npc"), y = grid::unit(0.5, "npc"), just = c("left"))
   
   circlize::circos.clear()
   
