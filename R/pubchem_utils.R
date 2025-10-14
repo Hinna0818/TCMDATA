@@ -37,7 +37,7 @@ getcid <- function(compound,
   
   cid_vec <- purrr::map_chr(compound, safe_query)
   
-  return(tibble::tibble(compound = compound, cid = cid_vec))
+  return(tibble::tibble(cid = cid_vec, compound = compound))
 }
 
 
