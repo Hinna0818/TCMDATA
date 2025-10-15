@@ -9,6 +9,7 @@
 #' @param match Match mode, one of "first", "best", or "all".
 #' @param pause Pause time (in seconds) between requests. Default is 0.25s (≈4 req/s).
 #' @param quiet Logical, whether to suppress messages. Default TRUE.
+#' @param ... Additional arguments passed to internal helper functions.
 #'
 #' @return A tibble with two columns: `compound` and `cid`.
 #' @importFrom webchem get_cid
@@ -44,6 +45,8 @@ getcid <- function(compound,
 #' get properties for compounds from PubChem
 #' @param cid Integer/numeric/character vector of PubChem CIDs.
 #' @param properties Character vector of PubChem property keys to request.
+#' @param ... Additional arguments passed to internal helper functions.
+
 #' @importFrom purrr slowly rate_delay insistently rate_backoff possibly map
 #' @importFrom webchem pc_prop
 #' @importFrom dplyr mutate

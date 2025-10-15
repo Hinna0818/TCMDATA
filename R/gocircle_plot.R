@@ -9,6 +9,7 @@
 #' @importFrom dplyr mutate select group_by summarise arrange slice_head ungroup desc
 #' @importFrom tidyr drop_na separate_rows
 #' @importFrom rlang .data
+#' @importFrom methods is
 #' 
 #' @export
 getGores <- function(x,

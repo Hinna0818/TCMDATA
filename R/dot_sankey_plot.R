@@ -149,16 +149,18 @@ make_colors <- function(items, colors, insert = NULL) {
 #' @param font_face Character. Font face for all text. Default is `"bold"`.
 #' @param sankey_lab Character. Label for the x-axis of the Sankey diagram. Default is `"Gene-Pathway"`.
 #' @param seed Integer. Random seed for reproducibility of layout. Default is `2025`.
+#' @param ... Additional arguments passed to internal helper functions.
 #' 
 #' @import ggplot2
 #' @importFrom ggalluvial geom_stratum geom_flow StatStratum to_lodes_form
-#' @importFrom stringr str_wrap
+#' @importFrom yulab.utils str_wrap
 #' @importFrom rlang .data
 #' @importFrom dplyr filter mutate count arrange select distinct left_join case_when desc
 #' @importFrom tidyr separate_rows
 #' @importFrom ggfun get_legend
 #' @importFrom aplot plot_list
 #' @importFrom RColorBrewer brewer.pal
+#' @importFrom scales pretty_breaks
 #' @return a ggplot object containing dot plot and sankey plot.
 
 ggdot_sankey <- function(
@@ -179,7 +181,7 @@ ggdot_sankey <- function(
     bubble_p_label = "p.adjust",
     sankey_width = 2,
     dot_width = 1,
-    font_family = "Arial",
+    font_family = "sans",
     font_face = "bold",
     sankey_lab = "Gene-Pathway",
     seed = 2025,
@@ -246,7 +248,7 @@ ggdot_sankey <- function(
     geom_text(
       stat = ggalluvial::StatStratum,
       data = function(x) dplyr::filter(x, .data$axis == "Pathway"),
-      aes(label = stringr::str_wrap(
+      aes(label = yulab.utils::str_wrap(
         ifelse(
           grepl("^spacer_", as.character(after_stat(stratum))),
           "", as.character(after_stat(stratum))), width = pathway_wrap)), 

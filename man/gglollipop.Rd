@@ -32,7 +32,9 @@ gglollipop(
 
 \item{text.col}{Character. Colors for text. Default is \code{black}.}
 
-\item{text.size}{Numeric. Font size for axis text and title. Default is 10.}
+\item{text.size}{Numeric. Font size for axis text and title. Default is 8.}
+
+\item{text.width}{Numeric. Font width for axis text and title. Default is 35.}
 
 \item{palette}{Character. Color palette name from \code{RColorBrewer} to use for dot color. Default is \code{"RdBu"}.}
 
@@ -45,6 +47,8 @@ gglollipop(
 \item{plot_title}{Character. Optional plot title. Default is \code{NULL}.}
 
 \item{show_count}{Logical. Whether to display the count value as a text label next to each dot. Default is TRUE}
+
+\item{...}{Additional arguments passed to internal helper functions.}
 }
 \value{
 A \code{ggplot} object showing a lollipop-style enrichment plot.

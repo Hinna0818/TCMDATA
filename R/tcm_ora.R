@@ -57,6 +57,7 @@ herb_ora_one <- function(genes, herb_targets, universe = NULL) {
 #'
 #' @param genes Character vector of query genes.
 #' @param herb_sets A vector of herbs' names.
+#' @param type A vector of search types of herb.
 #' @param universe Optional background size or background gene vector.
 #'   If `NULL`, defaults to the union of `tcmdata$target`.
 #' @param p_adjust_method Multiple-testing correction method (default "BH").
@@ -166,10 +167,11 @@ get_top_herb <- function(ora_res, top = 10){
 
 #' Bar plot for herb ORA results
 #'
-#' @param res A tibble containing herb-ora results.
+#' @param ora_res A tibble containing herb-ora results.
 #' @param top Integer. Number of herbs to plot (after sorting by FDR). Default 10.
 #' @param base_size Base font size.
 #' @param show_overlap Logical, whether to annotate bars with overlap counts.
+#' @param ... Additional arguments passed to internal helper functions.
 #' 
 #' @import ggplot2
 #' @importFrom forcats fct_reorder

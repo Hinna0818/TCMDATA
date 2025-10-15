@@ -17,6 +17,8 @@ herb_ora(
 
 \item{herb_sets}{A vector of herbs' names.}
 
+\item{type}{A vector of search types of herb.}
+
 \item{universe}{Optional background size or background gene vector.
 If \code{NULL}, defaults to the union of \code{tcmdata$target}.}
 

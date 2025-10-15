@@ -2,36 +2,51 @@
 % Please edit documentation in R/TCM_sankey.R
 \name{TCM_sankey}
 \alias{TCM_sankey}
-\title{Create a Sankey Diagram for Hierarchical TCM or Omics Data}
+\title{TCM Sankey Plot for herb-molecule-target}
 \usage{
 TCM_sankey(
   data,
-  text.size = 3,
-  text.position = 1,
-  x.axis.text.size = 12,
-  flow.alpha = 0.5,
-  palette = "rainbow_wh_rd",
-  ...
+  axis_order = c("herb", "molecule", "target"),
+  herb_cols = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+    "#e377c2", "#7f7f7f"),
+  mol_cols = c("#bcbd22", "#17becf", "#aec7e8", "#ffbb78", "#98df8a", "#ff9896",
+    "#c5b0d5", "#E41A1C", "#377EB8"),
+  target_cols = c("#c49c94", "#f7b6d2", "#dbdb8d", "#c7e9c0", "#f4cae4", "#e6f598",
+    "#ffeda0", "#BB5234", "#BB7813", "#FF6158"),
+  plot_font = "sans",
+  font_face = "bold",
+  font_size = 3.5,
+  width = 0.05,
+  alpha = 0.3,
+  knot.pos = 0.3
 )
 }
 \arguments{
-\item{data}{A \code{data.frame} for sankey_plot.}
+\item{data}{A data frame containing at least three columns: \code{herb}, \code{molecule}, and \code{target}.}
 
-\item{text.size}{Numeric. Size of node label text. Default is 3.}
+\item{axis_order}{Character vector specifying the order of axes in the Sankey diagram. Default is \code{c("herb", "molecule", "target")}.}
 
-\item{text.position}{Numeric. Horizontal justification of node labels; typically 0 (left),
-0.5 (center), or 1 (right). Default is 1.}
+\item{herb_cols}{Character vector defining the base color palette for the herb layer.}
 
-\item{x.axis.text.size}{Numeric. Font size of x-axis labels. Default is 12.}
+\item{mol_cols}{Character vector defining the base color palette for the molecule.}
 
-\item{flow.alpha}{Numeric (0–1). Transparency of the Sankey flows. Default is 0.5.}
+\item{target_cols}{Character vector defining the base color palette for the target.}
 
-\item{palette}{Character. Name of the color palette to use from \code{cols4all::c4a_pals()}.
-Default is \code{"rainbow_wh_rd"}.}
+\item{plot_font}{Character string specifying the font family used for text. Default is \code{"sans"}.}
+
+\item{font_face}{Character string specifying the font face. Default is \code{"bold"}.}
+
+\item{font_size}{Numeric value controlling the size of node labels. Default is \code{3.5}.}
+
+\item{width}{Numeric value controlling the width of both nodes and flows. Default is \code{0.05}.}
+
+\item{alpha}{Numeric value controlling the transparency of the flows. Default is \code{0.3}.}
+
+\item{knot.pos}{Numeric value (between 0 and 1) determining the curvature position of flow lines. Default is \code{0.3}.}
 }
 \value{
-A \code{ggplot} object.
+A \code{ggplot} object representing the herb–compound–target Sankey diagram.
 }
 \description{
-Create a Sankey Diagram for Hierarchical TCM or Omics Data
+TCM Sankey Plot for herb-molecule-target
 }

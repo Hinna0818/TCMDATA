@@ -15,10 +15,14 @@ Imports:
     igraph,
     ggplot2,
     ggrepel,
-    cols4all,
-    ggsankey,
+    ggalluvial,
+    ggfun,
+    magrittr,
+    purrr,
+    methods,
+    scales,
     RColorBrewer,
-    aplotExtra,
+    aplot,
     ggvenn,
     paletteer,
     tibble,
@@ -27,8 +31,12 @@ Imports:
     circlize,
     ComplexHeatmap,
     grid,
-    grDevices
+    grDevices,
+    webchem,
+    httr,
+    jsonlite
 License: Artistic-2.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
+LazyData: true

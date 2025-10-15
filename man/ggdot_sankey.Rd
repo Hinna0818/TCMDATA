@@ -22,7 +22,7 @@ ggdot_sankey(
   bubble_p_label = "p.adjust",
   sankey_width = 2,
   dot_width = 1,
-  font_family = "Arial",
+  font_family = "sans",
   font_face = "bold",
   sankey_lab = "Gene-Pathway",
   seed = 2025,
@@ -68,6 +68,8 @@ the Sankey diagram. Default is \code{c("Pathway", "Gene")}.}
 \item{sankey_lab}{Character. Label for the x-axis of the Sankey diagram. Default is \code{"Gene-Pathway"}.}
 
 \item{seed}{Integer. Random seed for reproducibility of layout. Default is \code{2025}.}
+
+\item{...}{Additional arguments passed to internal helper functions.}
 }
 \value{
 a ggplot object containing dot plot and sankey plot.

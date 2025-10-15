@@ -7,13 +7,15 @@
 herb_ora_plot(ora_res, top = 10, base_size = 12, show_overlap = TRUE, ...)
 }
 \arguments{
+\item{ora_res}{A tibble containing herb-ora results.}
+
 \item{top}{Integer. Number of herbs to plot (after sorting by FDR). Default 10.}
 
 \item{base_size}{Base font size.}
 
 \item{show_overlap}{Logical, whether to annotate bars with overlap counts.}
 
-\item{res}{A tibble containing herb-ora results.}
+\item{...}{Additional arguments passed to internal helper functions.}
 }
 \value{
 A ggplot object.

@@ -5,14 +5,16 @@
 #' @param top_n Integer. Number of top enriched terms to display. Default is 10.
 #' @param orderBy Character. Variable used to order the y-axis terms. Default is `"x"`.
 #' @param text.col Character. Colors for text. Default is `black`.
-#' @param text.size Numeric. Font size for axis text and title. Default is 10.
+#' @param text.size Numeric. Font size for axis text and title. Default is 8.
+#' @param text.width Numeric. Font width for axis text and title. Default is 35.
 #' @param palette Character. Color palette name from `RColorBrewer` to use for dot color. Default is `"RdBu"`.
 #' @param line.col Character. Color of the segment lines. Default is `"grey60"`.
 #' @param line.type Character. Line type for segments. Default is `"solid"`.
 #' @param line.size Numeric. Line width for segments. Default is 0.9.
 #' @param plot_title Character. Optional plot title. Default is `NULL`.
 #' @param show_count Logical. Whether to display the count value as a text label next to each dot. Default is TRUE
-#'
+#' @param ... Additional arguments passed to internal helper functions.
+
 #' @return A `ggplot` object showing a lollipop-style enrichment plot.
 #'
 #' @import ggplot2
