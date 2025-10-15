@@ -34,7 +34,7 @@ TCM_sankey <- function(
                    "#e6f598", "#ffeda0", "#BB5234", "#BB7813", "#FF6158"),
     plot_font = "sans",
     font_face = "bold",
-    font_size = 3.5,
+    font_size = 3.6,
     width = 0.05,
     alpha = 0.3,
     knot.pos = 0.3)
@@ -117,7 +117,7 @@ TCM_sankey <- function(
     scale_fill_identity() +
     guides(fill = "none") +
     theme_void() +
-    theme(plot.margin = margin(t = 0.8, r = 6, b = 1, l = 2, unit = "cm")) + 
+    theme(plot.margin = margin(t = 0.8, r = 4, b = 1, l = 4, unit = "cm")) + 
     coord_cartesian(clip = "off")
   
   return(sankeyPlot)
