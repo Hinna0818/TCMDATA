@@ -19,22 +19,22 @@ getenrichres <- function(x, n = 10) {
     stop("x must be an enrichResult (S4) or a data.frame.")
   }
   df <- tidyr::drop_na(df)
-  
+
   req_cols <- c("geneID", "Description", "Count", "GeneRatio")
   if (!all(req_cols %in% names(df))) {
     stop("Input must contain columns: geneID, Description, Count, GeneRatio.")
   }
-  
+
   if (!"RichFactor" %in% names(df)) df$RichFactor <- NA_real_
   if (!"FoldEnrichment" %in% names(df)) df$FoldEnrichment <- NA_real_
-  
+
   if ("p.adjust" %in% names(df)) {
     sig_col <- "p.adjust"
   }
   else {
     stop("No p.adjust column found in input.")
   }
-  
+
   df <- df |>
     dplyr::mutate(
       Count = as.numeric(.data$Count),
@@ -46,11 +46,11 @@ getenrichres <- function(x, n = 10) {
       sig = .data[[sig_col]]) |>
     dplyr::arrange(.data$sig) |>
     dplyr::slice(1:n) |>
-    dplyr::select(id = geneID, desc = Description, count = Count, 
-                  sig, GeneRatio = GeneRatio, RichFactor = RichFactor, FoldEnrichment = FoldEnrichment)
-    
+    dplyr::select(id = .data$geneID, desc = .data$Description, count = .data$Count,
+                  .data$sig, GeneRatio = .data$GeneRatio, RichFactor = .data$RichFactor, FoldEnrichment = .data$FoldEnrichment)
+
   df <- tibble::as_tibble(df)
-  
+
   return(df)
 }
 
@@ -65,18 +65,18 @@ getenrichres <- function(x, n = 10) {
 #' @importFrom rlang .data
 #' @importFrom purrr map_df
 #' @importFrom tibble as_tibble tibble
-#' @keywords internal 
+#' @keywords internal
 
 insert_spacer_nodes <- function(dat) {
   d <- tibble::as_tibble(dat)
   new_lvl <- list()
-  
+
   for (ax in unique(d$axis)) {
     old <- d %>%
       dplyr::filter(.data$axis == ax) %>%
       dplyr::pull(.data$stratum) %>%
       unique()
-    
+
     nm   <- paste0("spacer_", ax, "_", seq_along(old)[-length(old)])
     ord  <- character(0)
     ord[2 * (seq_along(old) - 1) + 1] <- old
@@ -85,9 +85,9 @@ insert_spacer_nodes <- function(dat) {
     ref_y <- d %>%
       dplyr::filter(.data$axis == ax) %>%
       dplyr::pull(.data$y_pos)
-    
+
     ref_y <- ref_y[1]
-    
+
     if (length(nm)) {
       spacer_rows <- purrr::map_df(nm, function(spacer_name) {
         tibble::tibble(
@@ -102,7 +102,7 @@ insert_spacer_nodes <- function(dat) {
     }
     new_lvl[[ax]] <- ord
   }
-  
+
   d$stratum <- factor(d$stratum, levels = unlist(new_lvl))
   return(d)
 }
@@ -115,14 +115,15 @@ insert_spacer_nodes <- function(dat) {
 #' @param insert Optional character vector of additional colors to insert into the palette.
 #'
 #' @importFrom grDevices colorRampPalette
+#' @importFrom stats setNames
 #' @keywords internal
 
 make_colors <- function(items, colors, insert = NULL) {
   items <- unique(items)
   n   <- length(items)
   base <- if (!is.null(insert)) c(colors, insert) else colors
-  if (n > length(base)) base <- colorRampPalette(base)(n) 
-  setNames(base[seq_len(n)], items)
+  if (n > length(base)) base <- colorRampPalette(base)(n)
+  stats::setNames(base[seq_len(n)], items)
 }
 
 
@@ -150,11 +151,12 @@ make_colors <- function(items, colors, insert = NULL) {
 #' @param sankey_lab Character. Label for the x-axis of the Sankey diagram. Default is `"Gene-Pathway"`.
 #' @param seed Integer. Random seed for reproducibility of layout. Default is `2025`.
 #' @param ... Additional arguments passed to internal helper functions.
-#' 
+#'
 #' @import ggplot2
 #' @importFrom ggalluvial geom_stratum geom_flow StatStratum to_lodes_form
 #' @importFrom yulab.utils str_wrap
 #' @importFrom rlang .data
+#' @importFrom stats setNames
 #' @importFrom dplyr filter mutate count arrange select distinct left_join case_when desc
 #' @importFrom tidyr separate_rows
 #' @importFrom ggfun get_legend
@@ -186,21 +188,21 @@ ggdot_sankey <- function(
     sankey_lab = "Gene-Pathway",
     seed = 2025,
     ...){
-  
+
   dot_x_var <- match.arg(dot_x_var)
-  
+
   bubble_x_label <- dot_x_var
-  
+
   set.seed(seed)
-  
+
   ## 1. get enrichment result
   et <- getenrichres(enrich_obj, n = n, ...)
-  
+
   dfForLodes <- et %>%
-    tidyr::separate_rows(id, convert = TRUE, sep = "/") %>%
-    dplyr::count(Gene = id , Pathway = desc, order = count, name = "Freq") %>%
-    dplyr::arrange(desc(.data$order))
-  
+    tidyr::separate_rows("id", convert = TRUE, sep = "/") %>%
+    dplyr::count(Gene = .data$id , Pathway = .data$desc, order = .data$count, name = "Freq") %>%
+    dplyr::arrange(dplyr::desc(.data$order))
+
   ## 2. prepare sankey data
   sankeyData <- ggalluvial::to_lodes_form(dfForLodes,
                                           key = "axis",
@@ -210,25 +212,25 @@ ggdot_sankey <- function(
       .data$axis == "Pathway" ~ desc_y_pos),
       alluvium = as.character(.data$alluvium),
       stratum = as.character(.data$stratum))
-  
+
   sankeyData <- insert_spacer_nodes(sankeyData)
-  
+
   ## 3. make colors
   gene_colors <- make_colors(items  = dfForLodes$Gene,colors = id_colors,insert = RColorBrewer::brewer.pal(12, "Paired"))
   pathway_colors <- make_colors(items  = dfForLodes$Pathway,colors = desc_colors,insert = RColorBrewer::brewer.pal(8, "Set1"))
   spacer_strata <- grep("spacer_", unique(sankeyData$stratum), value = TRUE)
-  spacer_colors <- setNames(rep("transparent", length(spacer_strata)), spacer_strata)
+  spacer_colors <- stats::setNames(rep("transparent", length(spacer_strata)), spacer_strata)
   nodeColors <- c(gene_colors, pathway_colors,spacer_colors)
-  
+
   sankeyData <- sankeyData %>%
     mutate(axis = factor(.data$axis, levels = axis_order)) %>%
     mutate(node_color = nodeColors[as.character(.data$stratum)]) %>%   # 节点色
     mutate(flow_color = .data$node_color)
-  
+
   ## 4. sankey plot
   base_theme <- theme(text = element_text(family = font_family, face = font_face),
                       plot.margin = unit(c(0, 0, 0, 0), "cm"))
-  
+
   sankeyPlot <- ggplot(
     data = sankeyData,
     aes(x = .data$axis, stratum = .data$stratum, alluvium = .data$alluvium, y = .data$y_pos)
@@ -240,8 +242,8 @@ ggdot_sankey <- function(
       stat = ggalluvial::StatStratum,
       data = function(x) dplyr::filter(x, .data$axis == "Gene"),
       aes(label = ifelse(
-        grepl("^spacer_", as.character(after_stat(stratum))),
-        "", as.character(after_stat(stratum))
+        grepl("^spacer_", as.character(after_stat(.data$stratum))),
+        "", as.character(after_stat(.data$stratum))
       )),
       hjust = 0, nudge_x = 0.03,
       size = sankey_text_size, family = font_family, fontface = font_face) +
@@ -250,8 +252,8 @@ ggdot_sankey <- function(
       data = function(x) dplyr::filter(x, .data$axis == "Pathway"),
       aes(label = yulab.utils::str_wrap(
         ifelse(
-          grepl("^spacer_", as.character(after_stat(stratum))),
-          "", as.character(after_stat(stratum))), width = pathway_wrap)), 
+          grepl("^spacer_", as.character(after_stat(.data$stratum))),
+          "", as.character(after_stat(.data$stratum))), width = pathway_wrap)),
       hjust = 0, nudge_x = 0.03, size = sankey_text_size, family = font_family, fontface = font_face) +
     scale_y_continuous(expand = c(0, 0)) +
     scale_x_discrete(expand = c(0, 0)) +
@@ -261,11 +263,11 @@ ggdot_sankey <- function(
     base_theme +
     labs(x = sankey_lab) +
     theme(axis.title.x = element_text(margin = margin(t = 6), size = 16))
-  
+
   ## 5. dot plot
   # extract plot data
   sankeyPlotData <- ggplot2::ggplot_build(sankeyPlot)
-  
+
   leftNodes <- sankeyPlotData$data[[1]] %>%
     dplyr::filter(.data$x == min(.data$x)) %>%
     dplyr::mutate(node_name = as.character(.data$stratum),
@@ -274,11 +276,11 @@ ggdot_sankey <- function(
            node_center_y = (.data$ymin + .data$ymax) / 2) %>%
     dplyr::filter(!grepl("spacer_", .data$node_name)) %>%
     dplyr::select(.data$node_name, .data$node_center_y, .data$ymin, .data$ymax)
-  
+
   dotData <- et %>%
     distinct(.data$desc, .keep_all = TRUE) %>%
-    left_join(leftNodes, by = c("desc" = "node_name")) 
-  
+    left_join(leftNodes, by = c("desc" = "node_name"))
+
   dotPlot <- ggplot(
     data = dotData,
     aes(x = .data[[dot_x_var]], y = .data$node_center_y, color = -log10(.data$sig))
@@ -287,8 +289,8 @@ ggdot_sankey <- function(
     scale_y_continuous(expand = c(0, 0)) +
     scale_x_continuous(expand = c(0, 0.003)) +
     scale_color_distiller(
-      palette = dot_palette, 
-      direction = -1,   
+      palette = dot_palette,
+      direction = -1,
       name = paste0("-log10(", bubble_p_label, ")")
     ) +
     scale_size_continuous(
@@ -317,25 +319,25 @@ ggdot_sankey <- function(
       panel.grid = element_blank(),
       axis.text.x = element_text(margin = margin(t = 4), size = 12),
       axis.title.x = element_text(margin = margin(t = 6), size = 16))
-  
+
   ## combine dot plot and sankey plot
   yRange <- sankeyPlotData$layout$panel_params[[1]]$y.range
-  
+
   sankeyPlot <- sankeyPlot + coord_cartesian(clip = "off", ylim = yRange)+
     theme(plot.margin = margin(0, 2.5, 0, 0.05, "cm"))
-  
+
   dotPlot <- dotPlot +
     annotate("rect",
              xmin = -Inf, xmax = Inf,
              ymin = -Inf, ymax = max(leftNodes$ymax),
              fill = NA, color = "black", linewidth = 0.3) +
     coord_cartesian(ylim = yRange)
-  
-  
+
+
   leg <- ggfun::get_legend(dotPlot)
-  combinedPlot <- plot_list(dotPlot + theme(legend.position = "none"), sankeyPlot, 
+  combinedPlot <- plot_list(dotPlot + theme(legend.position = "none"), sankeyPlot,
                             ncol = 2, widths = c(dot_width, sankey_width))
-  
+
   combinedPlot <- aplot::plot_list(leg, combinedPlot, ncol = 2, widths = c(1, 5))
 
   return(combinedPlot)

@@ -34,7 +34,8 @@ Imports:
     grDevices,
     webchem,
     httr,
-    jsonlite
+    jsonlite,
+    graphics
 License: Artistic-2.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

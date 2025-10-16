@@ -4,6 +4,7 @@
 #' @param col_names Character vector of columns to use (default: all except 1st)
 #' @param drop_empty Logical; whether to drop combinations with 0 genes
 #'
+#' @importFrom dplyr filter
 #' @return A data.frame with intersection combinations and their gene lists
 getvennresult <- function(venn_df,
                             col_names = NULL,
@@ -38,7 +39,7 @@ getvennresult <- function(venn_df,
   rownames(df) <- NULL
 
   if (drop_empty) {
-    df <- subset(df, Gene_Count > 0)
+    df <- dplyr::filter(df, .data$Gene_Count > 0)
   }
 
   return(df)

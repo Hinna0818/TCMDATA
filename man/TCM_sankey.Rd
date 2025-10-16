@@ -15,7 +15,7 @@ TCM_sankey(
     "#ffeda0", "#BB5234", "#BB7813", "#FF6158"),
   plot_font = "sans",
   font_face = "bold",
-  font_size = 3.5,
+  font_size = 3.6,
   width = 0.05,
   alpha = 0.3,
   knot.pos = 0.3

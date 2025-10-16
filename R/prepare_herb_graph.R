@@ -9,7 +9,8 @@
 #'
 #' @return A directed \code{igraph}
 #' @importFrom dplyr select bind_rows all_of case_when
-#' @importFrom igraph graph_from_data_frame degree eigen_centrality V
+#' @importFrom igraph graph_from_data_frame degree eigen_centrality V V<-
+#' @importFrom utils head
 #' @export
 
 prepare_herb_graph <- function(
@@ -33,7 +34,7 @@ prepare_herb_graph <- function(
     stop("Input data frame must contain columns: ", paste(required_cols, collapse = ", "))
   }
 
-  df <- df %>% head(n)
+  df <- df %>% utils::head(n)
 
   edges1 <- df %>% select(from = all_of(herb_col), to = all_of(molecule_col))
   edges2 <- df %>% select(from = all_of(molecule_col), to = all_of(target_col))

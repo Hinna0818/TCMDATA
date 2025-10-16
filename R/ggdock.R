@@ -1,5 +1,5 @@
 #' Plot molecule–target docking affinity heatmaps
-#' 
+#'
 #' @param dock_data A numeric matrix or data frame.
 #' @param order Reordering method for factor levels (optional).
 #' @param type Type of visualization, either `"dot"` or `"tile"`.
@@ -17,17 +17,17 @@
 #' @param ... Additional parameters passed to `geom_point()` or `geom_tile()`.
 #'
 #' @return A `ggplot` object.
-#' 
+#'
 #' @import ggplot2
 #' @importFrom paletteer scale_color_paletteer_c scale_fill_paletteer_c
 #' @importFrom tibble rownames_to_column
 #' @importFrom tidyr pivot_longer
 #' @importFrom forcats fct_reorder
-#' @importFrom dplyr mutate
+#' @importFrom dplyr mutate all_of
 #' @importFrom stats median
 #' @importFrom rlang .data
 #' @importFrom magrittr %>%
-#' 
+#'
 #' @export
 
 ggdock <- function(
@@ -47,22 +47,22 @@ ggdock <- function(
     label_family = "sans",
     label_fontface = "plain",
     ...){
-  
+
   type <- match.arg(type, c("dot", "tile"))
-  
+
   if (is.matrix(dock_data)) dock_data <- as.data.frame(dock_data)
-  
-  ## convert data structure 
+
+  ## convert data structure
   df_long <- dock_data %>%
     tibble::rownames_to_column("target") %>%
     tidyr::pivot_longer(
-      cols = -target,
+      cols = !dplyr::all_of("target"),
       names_to = "molecule",
       values_to = "affinity")
-  
+
   ## get order function (eg. max, min, median)
   order_fun <- get_order(order)
-  
+
   if (!is.null(order_fun)) {
     df_long <- df_long |>
       dplyr::mutate(
@@ -72,7 +72,7 @@ ggdock <- function(
                                         .fun = order_fun, .desc = TRUE)
       )
   }
-  
+
   if (type == "dot") {
     p <- ggplot(data = df_long, aes(x = .data[["molecule"]], y = .data[["target"]])) +
       geom_point(aes(color = .data[["affinity"]]), size = point_size, ...) +
@@ -83,7 +83,7 @@ ggdock <- function(
         axis.text.x = element_text(angle = angle, hjust = hjust, vjust = vjust),
         panel.grid.minor = element_blank()
       )
-  } 
+  }
   else {
     p <- ggplot(data = df_long, aes(x = .data[["molecule"]], y = .data[["target"]], fill = .data[["affinity"]])) +
       geom_tile(...) +
@@ -95,7 +95,7 @@ ggdock <- function(
         panel.grid.minor = element_blank()
       )
   }
-  
+
   if (isTRUE(label)) {
     p <- p + geom_text(
       aes(label = sprintf(paste0("%.", label_digits, "f"), .data[["affinity"]])),
@@ -105,7 +105,7 @@ ggdock <- function(
       fontface = label_fontface
     )
   }
-  
+
   return(p)
 }
 
