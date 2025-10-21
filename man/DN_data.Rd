@@ -3,30 +3,32 @@
 \docType{data}
 \name{DN_data}
 \alias{DN_data}
-\title{Example dataset: DN_data}
+\title{Differential expression results for diabetic nephropathy (DN)}
 \format{
-A named numeric vector of length \emph{N}:
+A named numeric vector:
 \describe{
-\item{names}{Character vector of gene symbols (e.g., \code{"TUSC5"}, \code{"ADIPOQ"}, \code{"CIDEC"}).}
-\item{values}{Numeric values indicating log₂ fold change between DN and control groups.}
+\item{name}{gene symbol}
+\item{value}{log2 fold change (advanced DN vs control)}
 }
 }
 \source{
-Curated and processed within the TCMDATA analysis workflow.
+GEO dataset \href{https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE142025}{GSE142025},
+analyzed using GEO2R (R 4.2.2, DESeq2 pipeline)
 }
 \usage{
 DN_data
 }
 \description{
-A ranked numeric vector representing differential gene expression (log₂ fold change)
-between early diabetic nephropathy (DN) patients and healthy controls.
-The gene names correspond to human gene symbols, and the numeric values indicate
-the direction and magnitude of expression changes.
+A named numeric vector of log2 fold changes derived from GSE142025,
+comparing kidney transcriptomes between advanced diabetic nephropathy
+(DN) patients and control individuals.
+
+The differential expression analysis was performed using GEO2R
+based on the raw count matrix from GSE142025, representing the
+\strong{full gene set} detected in human kidney tissue.
 }
-\details{
-Higher positive values indicate genes upregulated in DN patients, while
-negative values (if present) would indicate downregulation.
-The dataset is curated from publicly available transcriptomic data
-(see: \doi{10.2337/db19-0204}) and standardized for demonstration use.
+\examples{
+data(DN_data)
+head(DN_data)
 }
 \keyword{datasets}

@@ -109,3 +109,26 @@ getPieData <- function(
   return(pie_data)
 }
 
+
+#' compute MCC (maximum clique centrality) of PPI network.
+#' @param graph A igraph object from PPI network.
+#' @importFrom igraph max_cliques vcount V V<- 
+#' 
+#' @return An igraph object containing MCC.
+#' @export
+
+compute_MCC <- function(graph) {
+  
+  max_cliques_list <- igraph::max_cliques(graph)
+  mcc <- setNames(rep(0, igraph::vcount(graph)), igraph::V(graph)$name)
+  
+  for (clq in max_cliques_list) {
+    size <- length(clq)
+    weight <- factorial(size - 1)
+    mcc[igraph::V(graph)[clq]$name] <- mcc[igraph::V(graph)[clq]$name] + weight
+  }
+  
+  igraph::V(graph)$MCC <- mcc
+  
+  return(graph)
+}

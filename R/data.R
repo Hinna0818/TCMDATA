@@ -1,26 +1,49 @@
-#' Example dataset: DN_data
+#' Differential expression results for diabetic nephropathy (DN)
 #'
-#' @description
-#' A ranked numeric vector representing differential gene expression (log₂ fold change)
-#' between early diabetic nephropathy (DN) patients and healthy controls.
-#' The gene names correspond to human gene symbols, and the numeric values indicate
-#' the direction and magnitude of expression changes.
+#' A named numeric vector of log2 fold changes derived from GSE142025,
+#' comparing kidney transcriptomes between advanced diabetic nephropathy
+#' (DN) patients and control individuals.  
+#'  
+#' The differential expression analysis was performed using GEO2R
+#' based on the raw count matrix from GSE142025, representing the
+#' **full gene set** detected in human kidney tissue.
 #'
-#'
-#' @format A named numeric vector of length *N*:
+#' @format A named numeric vector:
 #' \describe{
-#'   \item{names}{Character vector of gene symbols (e.g., `"TUSC5"`, `"ADIPOQ"`, `"CIDEC"`).}
-#'   \item{values}{Numeric values indicating log₂ fold change between DN and control groups.}
+#'   \item{name}{gene symbol}
+#'   \item{value}{log2 fold change (advanced DN vs control)}
 #' }
 #'
-#' @details
-#' Higher positive values indicate genes upregulated in DN patients, while
-#' negative values (if present) would indicate downregulation.  
-#' The dataset is curated from publicly available transcriptomic data 
-#' (see: \doi{10.2337/db19-0204}) and standardized for demonstration use.
+#' @source GEO dataset [GSE142025](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE142025),
+#' analyzed using GEO2R (R 4.2.2, DESeq2 pipeline)
 #'
-#' @source Curated and processed within the TCMDATA analysis workflow.
+#' @examples
+#' data(DN_data)
+#' head(DN_data)
 "DN_data"
+
+
+#' Differentially expressed genes (DEGs) in diabetic nephropathy
+#'
+#' A data frame of significantly differentially expressed genes from
+#' GSE142025, comparing advanced diabetic nephropathy (DN) with control samples.
+#'
+#' @format A data frame with 4 columns:
+#' \describe{
+#'   \item{GeneID}{Ensembl gene identifier}
+#'   \item{padj}{adjusted p-value (FDR)}
+#'   \item{log2FoldChange}{log2 fold change (advanced DN vs control)}
+#'   \item{Symbol}{gene symbol}
+#' }
+#'
+#' @details DEGs were filtered using padj < 0.05 and |log2FC| > 1.5.
+#'
+#' @source GEO dataset [GSE142025](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE142025)
+#'
+#' @examples
+#' data(DN_deg)
+#' head(DN_deg)
+"DN_deg"
 
 
 #' Docking example dataset

@@ -17,6 +17,7 @@
 #'
 #' @importFrom httr GET POST status_code content user_agent
 #' @importFrom jsonlite fromJSON
+
 #' @keywords internal
 
 pug_request <- function(path, query = list(), body = NULL, method = c("GET","POST"),
@@ -71,8 +72,7 @@ resolve_cid <- function(x, from = c("cid","smiles","inchi","inchikey","name")) {
                       smiles   = "smiles",
                       inchi    = "inchi",
                       inchikey = "inchikey",
-                      name     = "name"
-  )
+                      name     = "name")
 
   .extract_first_cid <- function(res) {
     ids <- try(res$IdentifierList$CID, silent = TRUE)
@@ -112,52 +112,8 @@ resolve_cid <- function(x, from = c("cid","smiles","inchi","inchikey","name")) {
       }
     }
 
-    cid_first
+    return(cid_first)
   })
-}
-
-
-#' Similarity search (Tanimoto) on PubChem
-#'
-#' @param query identifier (CID/SMILES/InChIKey/Name)
-#' @param from one of c("cid","smiles","inchikey","name")
-#' @param threshold integer 0–100 (percent), e.g. 90
-#' @param topn max records to return. Default 10.
-#' @param ... Additional arguments passed to internal helper functions.
-#'
-#' @return tibble: query, hit_cid, score
-#' @export
-similarity_search <- function(query, from = c("smiles","cid","inchikey","name"),
-                              threshold = 90, topn = 10, ...) {
-  from <- match.arg(from)
-
-  if (from != "smiles") {
-    if (from == "cid") {
-      smi <- getprops(query, properties = "CanonicalSMILES")$CanonicalSMILES[1]
-    } else if (from == "inchikey") {
-      cid <- resolve_cid(query, from = "inchikey")
-      smi <- getprops(cid, properties = "CanonicalSMILES")$CanonicalSMILES[1]
-    } else { # name
-      cid <- resolve_cid(query, from = "name")
-      smi <- getprops(cid, properties = "CanonicalSMILES")$CanonicalSMILES[1]
-    }
-    query <- smi
-  }
-  if (is.na(query) || !nzchar(query)) {
-    return(tibble::tibble(query = NA_character_, hit_cid = character(), score = numeric()))
-  }
-
-  res <- pug_request(
-    path  = "compound/fastsimilarity_2d/smiles/cids/JSON",
-    query = list(Threshold = threshold, MaxRecords = topn, ...),
-    body  = list(smiles = query),
-    method = "POST"
-  )
-
-  cids <- res$IdentifierList$CID
-  tibble::tibble(query = query,
-                 hit_cid = as.character(if (is.null(cids)) character() else cids),
-                 score   = NA_real_)
 }
 
 
@@ -178,29 +134,29 @@ similarity_search <- function(query, from = c("smiles","cid","inchikey","name"),
 #' @importFrom webchem get_cid
 #' @importFrom purrr map_chr slowly
 #' @importFrom tibble tibble
+#' 
 #' @export
-#'
 getcid <- function(compound,
                    from = c("name", "smiles", "inchi"),
                    match = c("first", "best", "all"),
                    pause = 0.25,
                    quiet = TRUE,
                    ...) {
-
+  
   from  <- match.arg(from)
   match <- match.arg(match)
-
+  
   one_query <- function(x) {
     out <- suppressWarnings(
       webchem::get_cid(x, from = from, match = match, verbose = !quiet, ...)$cid)
     if (length(out)) as.character(out[[1]]) else NA_character_
   }
-
+  
   ## time limitation
   safe_query <- purrr::slowly(one_query, rate = purrr::rate_delay(pause = pause))
-
+  
   cid_vec <- purrr::map_chr(compound, safe_query)
-
+  
   return(tibble::tibble(cid = cid_vec, compound = compound))
 }
 
@@ -216,15 +172,17 @@ getcid <- function(compound,
 #' @importFrom tidyr unnest_wider
 #' @importFrom stats na.omit setNames
 #' @importFrom rlang .data
+#' 
+#' @export
 getprops <- function(cid,
-                    properties = c(
-                      "MolecularFormula",
-                      "MolecularWeight",
-                      "IUPACName",
-                      "CanonicalSMILES",
-                      "InChIKey",
-                      "XLogP"),
-                    ...){
+                     properties = c(
+                       "MolecularFormula",
+                       "MolecularWeight",
+                       "IUPACName",
+                       "CanonicalSMILES",
+                       "InChIKey",
+                       "XLogP"),
+                     ...){
   cid <- stats::na.omit(cid)
   slow_prop <- purrr::slowly(
     function(cid) webchem::pc_prop(cid, properties = properties, ...),
@@ -236,9 +194,162 @@ getprops <- function(cid,
     quiet = TRUE
   )
   prop_safe <- purrr::possibly(prop_retry, otherwise = stats::setNames(as.list(rep(NA, length(properties))), properties))
-
+  
   data.frame(cid = cid) |>
     dplyr::mutate(prop = purrr::map(.data$cid, prop_safe)) |>
     tidyr::unnest_wider("prop")
 }
+
+
+#' Similarity search (Tanimoto) on PubChem
+#'
+#' @param query identifier (CID/SMILES/InChIKey/Name)
+#' @param from one of c("cid","smiles","inchikey","name")
+#' @param threshold integer 0–100 (percent), e.g. 90
+#' @param topn max records to return. Default 10.
+#' @param fetch_factor The multiplier for overfetching candidate compounds (default = 5).
+#' @param ... Additional arguments passed to internal helper functions.
+#'
+#' @importFrom dplyr desc filter arrange slice_head
+#' @importFrom utils getFromNamespace
+#' @return tibble: query, hit_cid, hit_smiles, score(NA as default)
+#' @export
+compound_similarity <- function(query, 
+                                from = c("smiles","cid","inchikey","name"),
+                                threshold = 90, 
+                                topn = 10, 
+                                fetch_factor = 3,
+                                ...) {
+  from <- match.arg(from)
+  cid <- NA_character_
+  smi <- query
+  
+  `%||%` <- utils::getFromNamespace("%||%", "rlang")
+
+  if (from != "smiles") {
+    if (from == "cid") {
+      cid <- query
+      smi <- getprops(query, properties = "CanonicalSMILES")$CanonicalSMILES[1]
+    } 
+    else if (from == "inchikey") {
+      cid <- resolve_cid(query, from = "inchikey")
+      smi <- getprops(cid, properties = "CanonicalSMILES")$CanonicalSMILES[1]
+    } 
+    else { 
+      cid <- resolve_cid(query, from = "name")
+      smi <- getprops(cid, properties = "CanonicalSMILES")$CanonicalSMILES[1]
+    }
+    query <- smi
+  }
+  else{
+    cid <- tryCatch(resolve_cid(query, from = "smiles"), error = function(e) NA_character_)
+  }
+  
+  if (is.na(query) || !nzchar(query)) {
+    return(tibble::tibble(
+      query_cid  = cid,
+      query = query,
+      hit_cid = character(),
+      hit_smiles = character(),
+      score = numeric()
+    ))
+  }
+  
+  res <- pug_request(
+    path  = "compound/fastsimilarity_2d/smiles/cids/JSON",
+    query = list(Threshold = threshold, MaxRecords = topn * fetch_factor, ...),
+    body  = list(smiles = query),
+    method = "POST")
+
+  cids <- res$IdentifierList$CID %||% character(0)
+  cids <- as.character(cids)
+  
+  smi_hits <- tryCatch(
+    getprops(cids, properties = "CanonicalSMILES"),
+    error = function(e) NULL)
+  
+  if (is.null(smi_hits) || !("ConnectivitySMILES" %in% names(smi_hits))) {
+    smi_map <- character(0)                      
+  } 
+  else {
+    if (nrow(smi_hits) > 0) {
+      smi_hits <- smi_hits[!is.na(smi_hits$ConnectivitySMILES) &
+                             nzchar(smi_hits$ConnectivitySMILES), , drop = FALSE]
+    }
+    smi_map <- setNames(smi_hits$ConnectivitySMILES, smi_hits$cid)
+  }
+  
+  hit_smiles <- unname(smi_map[as.character(cids)])
+  
+  res <- tibble::tibble(query_cid = cid,
+                        query = query,
+                        hit_cid = as.character(if (is.null(cids)) character() else cids),
+                        hit_smiles = hit_smiles,
+                        score = NA_real_)
+  
+  ## add similarity score
+  res <- add_simscore(res) %>%
+    dplyr::arrange(dplyr::desc(.data$score)) %>%
+    dplyr::filter(!is.na(.data$score)) %>%
+    dplyr::slice_head(n = topn)
+  
+  return(res)
+}
+
+
+#' add similarity score of compounds
+#' @param df A tibble result from `compound_similarity`.
+#' @importFrom rcdk parse.smiles get.fingerprint
+#' @importFrom stats setNames
+#' @keywords internal
+add_simscore <- function(df) {
+  
+  stopifnot(all(c("query", "hit_smiles") %in% names(df)))
+  
+  smi_all <- unique(c(df$query, df$hit_smiles))
+  parse1  <- function(s) try(rcdk::parse.smiles(s)[[1]], silent = TRUE)
+  fp1 <- function(m) try(rcdk::get.fingerprint(m, type = "pubchem"), silent = TRUE)
+  
+  fp_map <- stats::setNames(vector("list", length(smi_all)), smi_all)
+  for (i in seq_along(smi_all)) {
+    s <- smi_all[i]
+    if (is.na(s) || !nzchar(s)) next
+    m <- parse1(s)
+    
+    if (inherits(m, "try-error") || is.null(m)) next
+    fp <- fp1(m)
+    
+    if (inherits(fp, "try-error")) next
+    fp_map[[i]] <- fp
+  }
+  
+  tanimoto_bits <- function(fp_a, fp_b) {
+    if (is.null(fp_a) || is.null(fp_b)) return(NA_real_)
+    a <- fp_a@bits
+    b <- fp_b@bits
+    
+    if (length(a) + length(b) == 0) return(NA_real_)
+    inter <- length(intersect(a, b))
+    uni   <- length(union(a, b))
+    
+    if (uni == 0) return(NA_real_)
+    inter / uni
+  }
+  
+  df$score <- mapply(
+    function(q, h) {
+      tanimoto_bits(fp_map[[match(q, smi_all)]], fp_map[[match(h, smi_all)]])
+    },
+    df$query, df$hit_smiles
+  )
+  
+  return(df)
+}
+
+
+
+
+
+
+
 
