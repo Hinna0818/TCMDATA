@@ -10,6 +10,7 @@ Imports:
     dplyr,
     rlang,
     tidyr,
+    clusterProfiler,
     yulab.utils,
     enrichplot,
     igraph,
