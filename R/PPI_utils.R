@@ -217,8 +217,9 @@ compute_nodeinfo <- function(g, weight_attr = "score") {
 #' Rank PPI nodes by integrated network centrality
 #'
 #' @param g An igraph object that has already been processed by \code{compute_nodeinfo()} or have added node metrics manually.
-#' @param metrics Character vector; which vertex attributes to use for scoring. Defaults to c("degree", "betweenness", "eigen_centrality", "MCC", "coreness").
+#' @param metrics Character vector; which vertex attributes to use for scoring. Defaults are the same as Cytohubba.
 #' @param weights Numeric vector of the same length as metrics; relative weights for each metric. If NULL (default), all metrics are equally weighted.
+#' @param use_weight Logical; whether use weighted metrics(beweenness and closeness) instead. Default is TRUE.
 #' @param na_rm Logical; if TRUE, NAs are ignored in normalization (set to 0.5).
 #'
 #' @importFrom igraph vertex_attr V
@@ -229,15 +230,37 @@ compute_nodeinfo <- function(g, weight_attr = "score") {
 rank_ppi_nodes <- function(g,
                            metrics = c(
                              "degree",
-                             "strength",
-                             "betweenness_w",
-                             "eigen_centrality",
-                             "pagerank",
+                             "betweenness",
+                             "closeness",
+                             "eccentricity",
+                             "radiality",
+                             "Stress",
                              "MCC",
-                             "coreness"),
+                             "MNC",
+                             "DMNC",
+                             "BN",
+                             "EPC"),
                            weights = NULL,
+                           use_weight = TRUE,
                            na_rm = TRUE) {
   stopifnot(inherits(g, "igraph"))
+
+  available_metrics <- names(igraph::vertex_attr(g))
+  message("Available metrics in graph: ", paste(available_metrics, collapse=", "))
+
+  if (use_weight){
+    metrics <- c("degree",
+                 "betweenness_w",
+                 "closeness_w",
+                 "eccentricity",
+                 "radiality",
+                 "Stress",
+                 "MCC",
+                 "MNC",
+                 "DMNC",
+                 "BN",
+                 "EPC")
+  }
 
   vdat <- igraph::vertex_attr(g)
   df <- as.data.frame(vdat, stringsAsFactors = FALSE)
@@ -246,6 +269,8 @@ rank_ppi_nodes <- function(g,
   if (length(metrics) == 0L) {
     stop("None of the requested metrics are present in vertex attributes.")
   }
+  message("Using the following metrics for ranking: ",
+          paste(metrics, collapse = ", "))
 
   # default: each metrics are equally weighted
   if (is.null(weights)) {

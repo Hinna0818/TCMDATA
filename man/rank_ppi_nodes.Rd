@@ -6,18 +6,21 @@
 \usage{
 rank_ppi_nodes(
   g,
-  metrics = c("degree", "strength", "betweenness_w", "eigen_centrality", "pagerank",
-    "MCC", "coreness"),
+  metrics = c("degree", "betweenness", "closeness", "eccentricity", "radiality",
+    "Stress", "MCC", "MNC", "DMNC", "BN", "EPC"),
   weights = NULL,
+  use_weight = TRUE,
   na_rm = TRUE
 )
 }
 \arguments{
 \item{g}{An igraph object that has already been processed by \code{compute_nodeinfo()} or have added node metrics manually.}
 
-\item{metrics}{Character vector; which vertex attributes to use for scoring. Defaults to c("degree", "betweenness", "eigen_centrality", "MCC", "coreness").}
+\item{metrics}{Character vector; which vertex attributes to use for scoring. Defaults are the same as Cytohubba.}
 
 \item{weights}{Numeric vector of the same length as metrics; relative weights for each metric. If NULL (default), all metrics are equally weighted.}
+
+\item{use_weight}{Logical; whether use weighted metrics(beweenness and closeness) instead. Default is TRUE.}
 
 \item{na_rm}{Logical; if TRUE, NAs are ignored in normalization (set to 0.5).}
 }
