@@ -113,6 +113,7 @@ getPieData <- function(
 #' Compute some useful metrics for PPI nodes
 #' @param g An igraph object containing PPI information.
 #' @param weight_attr Character; The attribute of weight in this PPI object.
+#' @param seed Numeric; Random seed for function `compute_EPC`. Default is 42.
 #' @importFrom igraph E V edge_attr_names edge_attr
 #' @importFrom igraph degree strength betweenness closeness
 #' @importFrom igraph eigen_centrality page_rank coreness
@@ -120,7 +121,7 @@ getPieData <- function(
 #' @return The input \code{igraph} object with additional vertex
 #' @export
 
-compute_nodeinfo <- function(g, weight_attr = "score") {
+compute_nodeinfo <- function(g, weight_attr = "score", seed = 42) {
   stopifnot(inherits(g, "igraph"))
 
   ## PPI score
@@ -208,7 +209,7 @@ compute_nodeinfo <- function(g, weight_attr = "score") {
 
   ## EPC
   message("Calculating EPC ...")
-  g <- compute_EPC(g)
+  g <- compute_EPC(g, seed = seed)
 
   return(g)
 }
