@@ -87,3 +87,68 @@ run_louvain <- function(g, resolution = 1.0, weights = NULL) {
 }
 
 
+#' Score and Rank Network Clusters
+#'
+#' This function evaluates the clusters/modules identified in the graph.
+#' It calculates a score for each cluster based on density and size (MCODE style),
+#' and returns a ranked data frame.
+#'
+#' @param g An \code{igraph} object. The graph must have a vertex attribute containing cluster labels.
+#' @param cluster_attr Character. The name of the vertex attribute that stores cluster labels. Default is louvain_cluster.
+#' @param min_size Integer. Clusters smaller than this size will be ignored. Default is 3.
+#'
+#' @return A data frame containing cluster statistics, ranked by Score.
+#' @importFrom igraph vertex_attr vertex_attr_names induced_subgraph vcount edge_density V ecount
+#' @export
+Addclusterscore <- function(g, cluster_attr = "louvain_cluster", min_size = 3) {
+  
+  stopifnot(inherits(g, "igraph"))
+  
+  if (!cluster_attr %in% igraph::vertex_attr_names(g)) {
+    stop(paste0("Attribute '", cluster_attr, "' not found in graph. Please run clustering first."))
+  }
+  
+  labels <- igraph::vertex_attr(g, cluster_attr)
+  unique_clusters <- unique(labels)
+  unique_clusters <- unique_clusters[!is.na(unique_clusters)] 
+  message(paste("Evaluating", length(unique_clusters), "clusters based on attribute:", cluster_attr))
+  
+  stats_list <- lapply(unique_clusters, function(cid) {
+    nodes_in_mod <- igraph::V(g)$name[labels == cid]
+    n_nodes <- length(nodes_in_mod)
+    
+    if (n_nodes < min_size) return(NULL)
+    subg <- igraph::induced_subgraph(g, nodes_in_mod)
+    
+    # Density = E / (N * (N-1) / 2)
+    dens <- igraph::edge_density(subg)
+    
+    # Score = Density * N
+    score <- dens * n_nodes
+    
+    data.frame(
+      Cluster_ID = as.character(cid),
+      Score      = round(score, 3),
+      Nodes      = n_nodes,
+      Edges      = igraph::ecount(subg),
+      Density    = round(dens, 3),
+      Gene_List  = paste(head(nodes_in_mod, 5), collapse = ", "),
+      Full_Genes = paste(nodes_in_mod, collapse = ","), 
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  stats_list <- stats_list[!sapply(stats_list, is.null)]
+  
+  if (length(stats_list) == 0) {
+    warning("No clusters passed the size filter.")
+    return(data.frame())
+  }
+  
+  df_res <- do.call(rbind, stats_list)
+  df_res <- df_res[order(df_res$Score, decreasing = TRUE), ]
+  rownames(df_res) <- NULL
+  
+  return(df_res)
+}
+
