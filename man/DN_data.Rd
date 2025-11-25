@@ -22,7 +22,8 @@ DN_data
 A named numeric vector of log2 fold changes derived from GSE142025,
 comparing kidney transcriptomes between advanced diabetic nephropathy
 (DN) patients and control individuals.
-
+}
+\details{
 The differential expression analysis was performed using GEO2R
 based on the raw count matrix from GSE142025, representing the
 \strong{full gene set} detected in human kidney tissue.
