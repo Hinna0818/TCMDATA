@@ -1,24 +1,22 @@
 #' -----------------------------------------------------------------------------
 #' Data Preparation Script: Combined Human and Mouse TF-Target Interactions
 #' -----------------------------------------------------------------------------
-#' 
+#'
 #' Source: DoRothEA (Discriminant Regulon Expression Analysis)
-#' Purpose: To retrieve, clean, and combine high-confidence transcription factor (TF) 
-#'          to target gene interactions for Human and Mouse into a single dataset 
+#' Purpose: To retrieve, clean, and combine high-confidence transcription factor (TF)
+#'          to target gene interactions for Human and Mouse into a single dataset
 #'          for the TCMDATA package.
-#' 
+#'
 #' References:
 #' 1. https://saezlab.github.io/dorothea/
 #' 2. Garcia-Alonso L, et al. Genome Research. 2019. DOI: 10.1101/gr.240663.118.
 #' -----------------------------------------------------------------------------
 
 # 1. Load necessary libraries
-if (!requireNamespace("dorothea", quietly = TRUE)) {
-  BiocManager::install("dorothea")
-}
-library(dorothea)
-library(dplyr)
-library(usethis)
+library(yulab.utils)
+pload(dorothea)
+pload(dplyr)
+pload(usethis)
 
 # -----------------------------------------------------------------------------
 # Part A: Process Human Data
