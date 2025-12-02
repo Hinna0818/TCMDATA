@@ -29,7 +29,7 @@ A tibble with 26118 rows and 5 columns:
 \url{https://saezlab.github.io/dorothea/}
 }
 \usage{
-tf_targets
+data(tf_targets)
 }
 \description{
 A comprehensive dataset containing high-confidence (levels A, B, and C) transcription factor (TF)
