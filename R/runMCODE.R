@@ -15,6 +15,8 @@
 #' \item{complexes}{List of gene symbols for each module.}
 #' \item{scores}{Numeric vector of node scores.}
 #' \item{module_scores}{Score (Density * Size) for each module.}
+#' @references Bader, G.D., Hogue, C.W. An automated method for finding molecular complexes in large protein interaction networks. 
+#' BMC Bioinformatics 4, 2 (2003). https://doi.org/10.1186/1471-2105-4-2
 #' @export
 runMCODE <- function(g, 
                   vwp = 0.2, 
