@@ -36,10 +36,7 @@ runMCODE(
 \item{max_depth}{Numeric. Maximum recursion depth for cluster finding (to prevent stack overflow on huge networks). Default 100.}
 }
 \value{
-A list containing:
-\item{complexes}{List of gene symbols for each module.}
-\item{scores}{Numeric vector of node scores.}
-\item{module_scores}{Score (Density * Size) for each module.}
+An updated igraph object containing MCODE clustering result.
 }
 \description{
 Molecular Complex Detection (MCODE) method for identifying PPI clusters.
