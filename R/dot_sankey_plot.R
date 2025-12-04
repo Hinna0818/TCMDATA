@@ -66,7 +66,6 @@ getenrichres <- function(x, n = 10) {
 #' @importFrom purrr map_df
 #' @importFrom tibble as_tibble tibble
 #' @keywords internal
-
 insert_spacer_nodes <- function(dat) {
   d <- tibble::as_tibble(dat)
   new_lvl <- list()
@@ -117,7 +116,6 @@ insert_spacer_nodes <- function(dat) {
 #' @importFrom grDevices colorRampPalette
 #' @importFrom stats setNames
 #' @keywords internal
-
 make_colors <- function(items, colors, insert = NULL) {
   items <- unique(items)
   n   <- length(items)
@@ -125,7 +123,6 @@ make_colors <- function(items, colors, insert = NULL) {
   if (n > length(base)) base <- colorRampPalette(base)(n)
   stats::setNames(base[seq_len(n)], items)
 }
-
 
 
 #' Dot–Sankey plot for enrichment results
@@ -165,7 +162,6 @@ make_colors <- function(items, colors, insert = NULL) {
 #' @importFrom scales pretty_breaks
 #' @return a ggplot object containing dot plot and sankey plot.
 #' @export
-
 ggdot_sankey <- function(
     enrich_obj,
     n = 10,

@@ -23,7 +23,6 @@
 #'
 #' @return A \code{ggplot} object representing the herb–compound–target Sankey diagram.
 #' @export
-
 TCM_sankey <- function(
     data,
     axis_order = c("herb", "molecule", "target"),
@@ -124,13 +123,3 @@ TCM_sankey <- function(
   return(sankeyPlot)
 
 }
-
-
-
-
-
-
-
-
-
-

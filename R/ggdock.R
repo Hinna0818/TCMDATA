@@ -29,7 +29,6 @@
 #' @importFrom magrittr %>%
 #'
 #' @export
-
 ggdock <- function(
     dock_data,
     order = NULL,
