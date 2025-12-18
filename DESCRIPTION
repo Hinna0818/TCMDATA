@@ -10,7 +10,7 @@ Imports:
     clusterProfiler,
     dplyr,
     igraph,
-    MCL,
+    Matrix,
     rlang,
     stats,
     tidyr,
