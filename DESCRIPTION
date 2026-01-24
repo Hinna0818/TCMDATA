@@ -8,12 +8,15 @@ Depends:
     R (>= 3.5.0)
 Imports:
     dplyr,
+    ggplot2,
+    httr,
     igraph,
     MCL,
     rlang,
     stats,
     tidyr,
-    utils
+    utils,
+    xml2
 License: Artistic-2.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
