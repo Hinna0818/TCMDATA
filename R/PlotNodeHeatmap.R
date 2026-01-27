@@ -7,7 +7,6 @@
 #' @param cluster_rows Logical. Whether to perform hierarchical clustering on rows. Default is TRUE.
 #' @param cluster_cols Logical. Whether to perform hierarchical clustering on columns. Default is FALSE.
 #' @param ... Additional arguments passed to `ComplexHeatmap::Heatmap`.
-#' @importFrom circlize colorRamp2
 #' @importFrom grid gpar unit
 #' @return A Heatmap object.
 #' @examples
@@ -15,10 +14,10 @@
 #' ppi <- compute_nodeinfo(demo_ppi)
 #' rk_res <- rank_ppi_nodes(ppi)[[2]]
 #' selected_cols <- colnames(rk_res)[c(2, 3, 4, 6, 9, 12, 14, 15, 16)]
-#' p1 <- PlotNodeHeatmap(rk_res, select_cols = selected_cols)
+#' p1 <- plot_node_heatmap(rk_res, select_cols = selected_cols)
 #' print(p1)
 #' @export
-PlotNodeHeatmap <- function(data, 
+plot_node_heatmap <- function(data, 
                             id_col = "name", 
                             select_cols = NULL, 
                             colors = c("#2166AC", "white", "#B2182B"), 
@@ -74,4 +73,10 @@ PlotNodeHeatmap <- function(data,
                                ...)
   
   return(p)
+}
+
+#' @export
+PlotNodeHeatmap <- function(...) {
+  warning("PlotNodeHeatmap is deprecated. Please use plot_node_heatmap instead.")
+  plot_node_heatmap(...)
 }

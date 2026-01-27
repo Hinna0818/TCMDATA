@@ -40,7 +40,7 @@ search_herb <- function(herb, type){
   if (type == "Herb_cn_name"){
     if (all(herb %in% unique(tcm_data$Herb_cn_name)) == FALSE){
       herb_not_exist <- setdiff(herb, unique(tcm_data$Herb_cn_name))
-      print(paste0(herb_not_exist, " doesn't/don't exist in our dataset."))
+      warning(paste0(paste(herb_not_exist, collapse=", "), " doesn't/don't exist in our dataset."))
       herb <- herb[-match(herb_not_exist, herb)]
     }
     
@@ -57,7 +57,7 @@ search_herb <- function(herb, type){
   if (type == "Herb_pinyin_name"){
     if (all(herb %in% unique(tcm_data$Herb_pinyin_name)) == FALSE){
       herb_not_exist <- setdiff(herb, unique(tcm_data$Herb_pinyin_name))
-      print(paste0(herb_not_exist, " doesn't/don't exist in our dataset."))
+      warning(paste0(paste(herb_not_exist, collapse=", "), " doesn't/don't exist in our dataset."))
       herb <- herb[-match(herb_not_exist, herb)]
     }
     
@@ -74,7 +74,7 @@ search_herb <- function(herb, type){
   #if (type == "Herb_en_name"){
   if (all(herb %in% unique(tcm_data$Herb_en_name)) == FALSE){
     herb_not_exist <- setdiff(herb, unique(tcm_data$Herb_en_name))
-    print(paste0(herb_not_exist, " doesn't/don't exist in our dataset."))
+    warning(paste0(paste(herb_not_exist, collapse=", "), " doesn't/don't exist in our dataset."))
     herb <- herb[-match(herb_not_exist, herb)]
   }
     
@@ -115,7 +115,7 @@ search_target <- function(gene_list){
   # Check existence of genes in the dataset
   if (!all(gene_list %in% unique(tcm_data$target))){
     gene_diff <- setdiff(gene_list, unique(tcm_data$target))
-    print(paste0(gene_diff, " doesn't/don't exist in the datasets."))
+    warning(paste0(paste(gene_diff, collapse=", "), " doesn't/don't exist in the datasets."))
     gene_list <- gene_list[-match(gene_diff, gene_list)]
   }
   

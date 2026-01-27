@@ -15,12 +15,16 @@
 #' @param pause Numeric. Base pause (seconds) between retries.
 #' @param max_times Integer. Maximum number of retry attempts before giving up.
 #'
-#' @importFrom httr GET POST status_code content user_agent
-#' @importFrom jsonlite fromJSON
-
 #' @keywords internal
 pug_request <- function(path, query = list(), body = NULL, method = c("GET","POST"),
                         pause = 0.25, max_times = 5) {
+  if (!requireNamespace("httr", quietly = TRUE)) {
+    stop("Package 'httr' is required for pug_request(). Please install it.")
+  }
+  if (!requireNamespace("jsonlite", quietly = TRUE)) {
+    stop("Package 'jsonlite' is required for pug_request(). Please install it.")
+  }
+
   method <- match.arg(method)
   url <- paste0(.pug_base, sub("^/+","", path))
   do_req <- function() {

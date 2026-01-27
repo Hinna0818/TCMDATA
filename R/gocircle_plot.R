@@ -104,10 +104,6 @@ getGores <- function(x,
 #' @param fontfamily Character. Font family, e.g. "sans", "serif", "mono".
 #' @param ... Additional parameters for flexibility.
 #'
-#' @importFrom circlize circos.clear circos.par circos.genomicInitialize circos.track
-#' @importFrom circlize circos.genomicTrack circos.genomicTrackPlotRegion circos.genomicRect
-#' @importFrom circlize get.cell.meta.data circos.axis circos.text colorRamp2
-#' 
 #' @importFrom grid gpar unit
 #' @importFrom graphics par
 #' @importFrom grDevices colorRampPalette
@@ -135,6 +131,11 @@ gocircle_plot <- function(
   # Check for ComplexHeatmap availability
   if (!requireNamespace("ComplexHeatmap", quietly = TRUE)) {
     stop("Package 'ComplexHeatmap' is required but not installed. Please install it from Bioconductor using: BiocManager::install(\"ComplexHeatmap\")")
+  }
+
+  # Check for circlize availability
+  if (!requireNamespace("circlize", quietly = TRUE)) {
+    stop("Package 'circlize' is required for gocircle_plot(). Please install it from Bioconductor using: BiocManager::install(\"circlize\")")
   }
   
   x1 <- getGores(x, up_genes = up_genes, down_genes = down_genes, top = top)

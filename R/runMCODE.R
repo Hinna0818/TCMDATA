@@ -20,7 +20,7 @@
 #' str(ppi)
 #'
 #' @export
-runMCODE <- function(g,
+run_mcode <- function(g,
                   vwp = 0.2,
                   degree_cutoff = 2,
                   k_core_threshold = 2,
@@ -291,13 +291,13 @@ runMCODE <- function(g,
 #' MCODE_res <- getMCODE_res(ppi)
 #' print(head(MCODE_res))
 #' @export
-getMCODE_res <- function(g, only_clusters = FALSE) {
+get_mcode_res <- function(g, only_clusters = FALSE) {
 
   if (!is_igraph(g)) stop("Input must be an igraph object.")
 
   required_attrs <- c("mcode_score", "mcode_cluster", "mcode_module_score")
   if (!all(required_attrs %in% vertex_attr_names(g))) {
-    stop("The graph does not contain MCODE results. Please run runMCODE() first.")
+    stop("The graph does not contain MCODE results. Please run run_mcode() first.")
   }
 
   df <- igraph::as_data_frame(g, what = "vertices")
@@ -323,6 +323,18 @@ getMCODE_res <- function(g, only_clusters = FALSE) {
   rownames(res_df) <- NULL
 
   return(res_df)
+}
+
+#' @export
+getMCODE_res <- function(...) {
+  warning("getMCODE_res is deprecated. Please use get_mcode_res instead.")
+  get_mcode_res(...)
+}
+
+#' @export
+runMCODE <- function(...) {
+  warning("runMCODE is deprecated. Please use run_mcode instead.")
+  run_mcode(...)
 }
 
 

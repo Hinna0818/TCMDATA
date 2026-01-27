@@ -22,8 +22,7 @@
 #'
 #' @return A \code{ggplot} object representing the herb–compound–target Sankey diagram.
 #' @export
-
-TCM_sankey <- function(
+tcm_sankey <- function(
     data,
     axis_order = c("herb", "molecule", "target"),
     herb_cols = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
@@ -40,7 +39,7 @@ TCM_sankey <- function(
     knot.pos = 0.3)
 {
   if (!requireNamespace("ggalluvial", quietly = TRUE)) {
-    stop("Package 'ggalluvial' is required for TCM_sankey(). Please install it.")
+    stop("Package 'ggalluvial' is required for tcm_sankey(). Please install it.")
   }
 
   set.seed(2025)
@@ -126,6 +125,12 @@ TCM_sankey <- function(
 
   return(sankeyPlot)
 
+}
+
+#' @export
+TCM_sankey <- function(...) {
+  warning("TCM_sankey is deprecated. Please use tcm_sankey instead.")
+  tcm_sankey(...)
 }
 
 
