@@ -239,8 +239,8 @@ ggdot_sankey <- function(
     data = sankeyData,
     aes(x = .data$axis, stratum = .data$stratum, alluvium = .data$alluvium, y = .data$y_pos)
   ) +
-    geom_stratum(aes(fill = .data$node_color), color = NA, width = 0.05) +
-    geom_flow(aes(fill = .data$flow_color), alpha = 0.3, width = 0.05,
+    ggalluvial::geom_stratum(aes(fill = .data$node_color), color = NA, width = 0.05) +
+    ggalluvial::geom_flow(aes(fill = .data$flow_color), alpha = 0.3, width = 0.05,
               knot.pos = 0.3, color = "transparent") +
     geom_text(
       stat = ggalluvial::StatStratum,
