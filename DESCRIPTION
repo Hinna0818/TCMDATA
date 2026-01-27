@@ -9,18 +9,19 @@ Depends:
 Imports:
     aplot,
     circlize,
+    clusterProfiler,
     dplyr,
     enrichplot,
     forcats,
-    ggalluvial,
     ggfun,
     ggplot2,
     ggrepel,
-    ggvenn,
     grDevices,
+    httr,
     igraph,
+    jsonlite,
     magrittr,
-    MCL,
+    Matrix,
     methods,
     paletteer,
     purrr,
@@ -34,7 +35,14 @@ Imports:
     yulab.utils
 Suggests:
     ComplexHeatmap,
-    testthat
+    rcdk,
+    webchem,
+    ggtangle,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    ggalluvial,
+    ggvenn
 License: Artistic-2.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

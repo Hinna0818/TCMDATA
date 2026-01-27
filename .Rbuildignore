@@ -4,3 +4,5 @@ Makefile
 README.Rmd
 README_files
 ^data-raw$
+^\.RData$
+^\.Rhistory$"

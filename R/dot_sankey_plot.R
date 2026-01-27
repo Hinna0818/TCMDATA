@@ -153,7 +153,6 @@ make_colors <- function(items, colors, insert = NULL) {
 #' @param ... Additional arguments passed to internal helper functions.
 #'
 #' @import ggplot2
-#' @importFrom ggalluvial geom_stratum geom_flow StatStratum to_lodes_form
 #' @importFrom yulab.utils str_wrap
 #' @importFrom rlang .data
 #' @importFrom stats setNames
@@ -189,6 +188,10 @@ ggdot_sankey <- function(
     sankey_lab = "Gene-Pathway",
     seed = 2025,
     ...){
+
+  if (!requireNamespace("ggalluvial", quietly = TRUE)) {
+    stop("Package 'ggalluvial' is required for ggdot_sankey(). Please install it.")
+  }
 
   dot_x_var <- match.arg(dot_x_var)
 

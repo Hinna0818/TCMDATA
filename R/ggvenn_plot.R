@@ -19,7 +19,6 @@
 #'
 #' @return A \code{ggplot} object representing the Venn diagram.
 #' 
-#' @importFrom ggvenn ggvenn
 #' @importFrom ggplot2 scale_x_continuous expansion
 #' @importFrom dplyr setdiff
 #' @export
@@ -39,6 +38,10 @@ ggvenn_plot <- function(venn_df,
                           digits = 1,
                           expand_ratio = 0.2) {
   
+  if (!requireNamespace("ggvenn", quietly = TRUE)) {
+    stop("Package 'ggvenn' is required for ggvenn_plot(). Please install it.")
+  }
+
   if (is.null(col_names)) {
     col_names <- colnames(venn_df)[-1]
   }
