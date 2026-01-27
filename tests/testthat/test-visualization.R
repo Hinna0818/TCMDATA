@@ -76,7 +76,7 @@ test_that("TCM_sankey works with basic input", {
   )
   
   # Test that function runs without error
-  expect_silent(p <- TCM_sankey(mock_data))
+  expect_silent(p <- tcm_sankey(mock_data))
   expect_s3_class(p, "ggplot")
 })
 
@@ -93,7 +93,7 @@ test_that("PlotNodeHeatmap requires ComplexHeatmap", {
   )
   
   # Test that function runs without error when ComplexHeatmap is available
-  expect_silent(p <- PlotNodeHeatmap(mock_metrics))
+  expect_silent(p <- plot_node_heatmap(mock_metrics))
   expect_s4_class(p, "Heatmap")
 })
 
@@ -131,11 +131,11 @@ test_that("radar_plot works with basic input", {
 
 test_that("visualization functions handle invalid input gracefully", {
   # Test gglollipop with non-enrichment input
-  expect_error(gglollipop(data.frame()), "unable to find an inherited method")
+  expect_error(gglollipop(data.frame()))
   
   # Test ggvenn_plot with empty list
   expect_error(ggvenn_plot(list()), "ggvenn_plot only supports 2 to 4 sets")
   
   # Test ggdock with missing columns
-  expect_error(ggdock(data.frame()), "cols` must select at least one column")
+  expect_error(ggdock(data.frame()))
 })

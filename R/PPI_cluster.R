@@ -73,7 +73,7 @@ run_MCL <- function(g,
     diff <- sum((M - M_prev)^2)
 
     if (diff < 1e-5) {
-      cat(sprintf("Converged at iteration %d (Diff: %.2e)\n", i, diff))
+      message(sprintf("Converged at iteration %d (Diff: %.2e)", i, diff))
       break
     }
   }
@@ -188,11 +188,11 @@ run_louvain <- function(g, resolution = 1.0, weights = NULL) {
 #' @examples
 #' data(demo_ppi)
 #' ppi <- run_louvain(demo_ppi, resolution = 1)
-#' louvain_score <- Addclusterscore(ppi, cluster_attr = "louvain_cluster", min_size = 3)
+#' louvain_score <- add_cluster_score(ppi, cluster_attr = "louvain_cluster", min_size = 3)
 #' head(louvain_score)
 #'
 #' @export
-Addclusterscore <- function(g, cluster_attr = "louvain_cluster", min_size = 3) {
+add_cluster_score <- function(g, cluster_attr = "louvain_cluster", min_size = 3) {
 
   stopifnot(inherits(g, "igraph"))
 
@@ -242,5 +242,11 @@ Addclusterscore <- function(g, cluster_attr = "louvain_cluster", min_size = 3) {
   rownames(df_res) <- NULL
 
   return(df_res)
+}
+
+#' @export
+Addclusterscore <- function(...) {
+  warning("Addclusterscore is deprecated. Please use add_cluster_score instead.")
+  add_cluster_score(...)
 }
 

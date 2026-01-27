@@ -10,8 +10,6 @@
 #' @param email Character. User email address required by NCBI E-utils.
 #' @param retmax Integer. Maximum number of PMIDs to retrieve. Default is 1000.
 #' @param ... Additional arguments passed to other methods.
-#' @importFrom httr GET content
-#' @importFrom xml2 read_xml xml_find_all xml_text xml_find_first
 #' @importFrom dplyr bind_rows group_by summarise arrange n desc %>% filter
 #' @importFrom utils txtProgressBar setTxtProgressBar
 #' 
@@ -39,6 +37,14 @@ get_pubmed_data <- function(tcm_name,
                             retmax = 1000,
                             ...) {
   
+  if (!requireNamespace("httr", quietly = TRUE)) {
+    stop("Package 'httr' is required for get_pubmed_data(). Please install it.")
+  }
+
+  if (!requireNamespace("xml2", quietly = TRUE)) {
+    stop("Package 'xml2' is required for get_pubmed_data(). Please install it.")
+  }
+  
   if (is.null(email)) {
     stop("NCBI requires an email address to use E-utils. Please provide one.")
   }
@@ -61,8 +67,8 @@ get_pubmed_data <- function(tcm_name,
   check_url <- "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
   check_res <- httr::GET(check_url, query = list(db = "pubmed", term = query, 
                                                  retmax = 0, retmode = "xml", email = email, ...))
-  check_xml <- read_xml(httr::content(check_res, "text", encoding = "UTF-8"))
-  total_count <- as.numeric(xml_text(xml_find_first(check_xml, "//Count")))
+  check_xml <- xml2::read_xml(httr::content(check_res, "text", encoding = "UTF-8"))
+  total_count <- as.numeric(xml2::xml_text(xml2::xml_find_first(check_xml, "//Count")))
   
   if (length(total_count) == 0 || total_count == 0) {
     message("No literature found.")
@@ -100,8 +106,8 @@ get_pubmed_data <- function(tcm_name,
   search_res <- httr::GET(check_url, query = list(db = "pubmed", term = query, 
                                                   retmax = final_retmax, usehistory = "y", email = email, ...))
   
-  search_xml <- read_xml(httr::content(search_res, "text", encoding = "UTF-8"))
-  pmids <- xml_text(xml_find_all(search_xml, "//IdList/Id"))
+  search_xml <- xml2::read_xml(httr::content(search_res, "text", encoding = "UTF-8"))
+  pmids <- xml2::xml_text(xml2::xml_find_all(search_xml, "//IdList/Id"))
   total_found <- length(pmids)
   
   if (total_found == 0) {
@@ -127,24 +133,24 @@ get_pubmed_data <- function(tcm_name,
     
     Sys.sleep(0.4) 
     
-    fetch_xml <- read_xml(httr::content(fetch_res, "text", encoding = "UTF-8"))
-    articles <- xml_find_all(fetch_xml, "//PubmedArticle")
+    fetch_xml <- xml2::read_xml(httr::content(fetch_res, "text", encoding = "UTF-8"))
+    articles <- xml2::xml_find_all(fetch_xml, "//PubmedArticle")
     
     batch_df <- lapply(articles, function(article) {
-      year_node <- xml_find_first(article, ".//PubDate/Year")
-      if (is.na(xml_text(year_node))) {
-        medline_date <- xml_text(xml_find_first(article, ".//PubDate/MedlineDate"))
+      year_node <- xml2::xml_find_first(article, ".//PubDate/Year")
+      if (is.na(xml2::xml_text(year_node))) {
+        medline_date <- xml2::xml_text(xml2::xml_find_first(article, ".//PubDate/MedlineDate"))
         pub_year <- regmatches(medline_date, regexpr("\\d{4}", medline_date))
       } else {
-        pub_year <- xml_text(year_node)
+        pub_year <- xml2::xml_text(year_node)
       }
       
       data.frame(
-        PMID = xml_text(xml_find_first(article, ".//PMID")),
-        Title = xml_text(xml_find_first(article, ".//ArticleTitle")),
+        PMID = xml2::xml_text(xml2::xml_find_first(article, ".//PMID")),
+        Title = xml2::xml_text(xml2::xml_find_first(article, ".//ArticleTitle")),
         Year = as.numeric(pub_year),
-        Journal = xml_text(xml_find_first(article, ".//Journal/Title")),
-        Abstract = xml_text(xml_find_first(article, ".//AbstractText")),
+        Journal = xml2::xml_text(xml2::xml_find_first(article, ".//Journal/Title")),
+        Abstract = xml2::xml_text(xml2::xml_find_first(article, ".//AbstractText")),
         stringsAsFactors = FALSE
       )
     })
