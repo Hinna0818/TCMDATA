@@ -181,7 +181,7 @@ run_louvain <- function(g, resolution = 1.0, weights = NULL) {
 #' @param g An \code{igraph} object. The graph must have a vertex attribute containing cluster labels.
 #' @param cluster_attr Character. The name of the vertex attribute that stores cluster labels. Default is louvain_cluster.
 #' @param min_size Integer. Clusters smaller than this size will be ignored. Default is 3.
-#'
+#' @param ... Additional arguments passed to `add_cluster_score` when using the deprecated alias `Addclusterscore`.
 #' @return A data frame containing cluster statistics, ranked by Score.
 #' @importFrom igraph vertex_attr vertex_attr_names induced_subgraph vcount edge_density V ecount
 #' @importFrom utils head
@@ -244,6 +244,7 @@ add_cluster_score <- function(g, cluster_attr = "louvain_cluster", min_size = 3)
   return(df_res)
 }
 
+#' @rdname add_cluster_score
 #' @export
 Addclusterscore <- function(...) {
   warning("Addclusterscore is deprecated. Please use add_cluster_score instead.")

@@ -2,6 +2,7 @@
 % Please edit documentation in R/runMCODE.R
 \name{run_mcode}
 \alias{run_mcode}
+\alias{runMCODE}
 \title{Molecular Complex Detection (MCODE) method for identifying PPI clusters.}
 \usage{
 run_mcode(
@@ -15,6 +16,8 @@ run_mcode(
   loops = FALSE,
   max_depth = 100
 )
+
+runMCODE(...)
 }
 \arguments{
 \item{g}{An igraph object (PPI network).}
@@ -34,6 +37,8 @@ run_mcode(
 \item{loops}{Logical. Whether to include self-loops in scoring. Default FALSE.}
 
 \item{max_depth}{Numeric. Maximum recursion depth for cluster finding (to prevent stack overflow on huge networks). Default 100.}
+
+\item{...}{Additional arguments passed to \code{run_mcode} when using the deprecated alias \code{runMCODE}.}
 }
 \value{
 An updated igraph object containing MCODE clustering result.
@@ -43,7 +48,7 @@ Molecular Complex Detection (MCODE) method for identifying PPI clusters.
 }
 \examples{
 data(demo_ppi)
-ppi <- runMCODE(demo_ppi, max_depth = 100)
+ppi <- run_mcode(demo_ppi, max_depth = 100)
 str(ppi)
 
 }

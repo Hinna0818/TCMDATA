@@ -2,14 +2,19 @@
 % Please edit documentation in R/runMCODE.R
 \name{get_mcode_res}
 \alias{get_mcode_res}
+\alias{getMCODE_res}
 \title{Extract MCODE analysis results as a data frame}
 \usage{
 get_mcode_res(g, only_clusters = FALSE)
+
+getMCODE_res(...)
 }
 \arguments{
 \item{g}{An igraph object processed by \code{runMCODE}.}
 
 \item{only_clusters}{Logical. If TRUE, returns only nodes that belong to a cluster. Default FALSE.}
+
+\item{...}{Additional arguments passed to \code{get_mcode_res} when using the deprecated alias \code{getMCODE_res}.}
 }
 \value{
 A data frame with columns:
@@ -25,6 +30,6 @@ Extract MCODE analysis results as a data frame
 \examples{
 data(demo_ppi)
 ppi <- runMCODE(demo_ppi, max_depth = 100)
-MCODE_res <- getMCODE_res(ppi)
+MCODE_res <- get_mcode_res(ppi)
 print(head(MCODE_res))
 }

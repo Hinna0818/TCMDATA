@@ -2,9 +2,12 @@
 % Please edit documentation in R/PPI_cluster.R
 \name{add_cluster_score}
 \alias{add_cluster_score}
+\alias{Addclusterscore}
 \title{Score and Rank Network Clusters}
 \usage{
 add_cluster_score(g, cluster_attr = "louvain_cluster", min_size = 3)
+
+Addclusterscore(...)
 }
 \arguments{
 \item{g}{An \code{igraph} object. The graph must have a vertex attribute containing cluster labels.}
@@ -12,6 +15,8 @@ add_cluster_score(g, cluster_attr = "louvain_cluster", min_size = 3)
 \item{cluster_attr}{Character. The name of the vertex attribute that stores cluster labels. Default is louvain_cluster.}
 
 \item{min_size}{Integer. Clusters smaller than this size will be ignored. Default is 3.}
+
+\item{...}{Additional arguments passed to \code{add_cluster_score} when using the deprecated alias \code{Addclusterscore}.}
 }
 \value{
 A data frame containing cluster statistics, ranked by Score.

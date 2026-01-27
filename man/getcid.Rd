@@ -35,7 +35,8 @@ This function wraps \code{webchem::get_cid()} with built-in rate limiting
 (≤5 requests per second as recommended by PubChem).
 }
 \examples{
+\dontrun{
 res_smiles <- getcid("CCO", from = "smiles")
 print(res_smiles)
-
+}
 }
