@@ -1,6 +1,5 @@
 #' TCM Sankey Plot for herb-molecule-target
 #'
-#'
 #' @param data A data frame containing at least three columns: \code{herb}, \code{molecule}, and \code{target}.
 #' @param axis_order Character vector specifying the order of axes in the Sankey diagram. Default is \code{c("herb", "molecule", "target")}.
 #' @param herb_cols Character vector defining the base color palette for the herb layer.
@@ -12,7 +11,7 @@
 #' @param width Numeric value controlling the width of both nodes and flows. Default is \code{0.05}.
 #' @param alpha Numeric value controlling the transparency of the flows. Default is \code{0.3}.
 #' @param knot.pos Numeric value (between 0 and 1) determining the curvature position of flow lines. Default is \code{0.3}.
-#'
+#' @param ... Additional arguments passed to `tcm_sankey` when using the deprecated alias `TCM_sankey`.
 #' @import ggplot2
 #' @importFrom dplyr count mutate group_by ungroup arrange select filter lead case_when all_of desc
 #' @importFrom RColorBrewer brewer.pal
@@ -127,6 +126,7 @@ tcm_sankey <- function(
 
 }
 
+#' @rdname tcm_sankey
 #' @export
 TCM_sankey <- function(...) {
   warning("TCM_sankey is deprecated. Please use tcm_sankey instead.")

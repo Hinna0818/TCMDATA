@@ -9,14 +9,14 @@
 #' @param fdt Numeric. Fluff Node Density Cutoff. Used if fluff=TRUE. Default 0.1.
 #' @param loops Logical. Whether to include self-loops in scoring. Default FALSE.
 #' @param max_depth Numeric. Maximum recursion depth for cluster finding (to prevent stack overflow on huge networks). Default 100.
-#'
+#' @param ... Additional arguments passed to `run_mcode` when using the deprecated alias `runMCODE`.
 #' @importFrom igraph is_igraph simplify as_undirected induced_subgraph edge_density vcount V V<-
 #' @return An updated igraph object containing MCODE clustering result.
 #' @references Bader, G.D., Hogue, C.W. An automated method for finding molecular complexes in large protein interaction networks.
 #' BMC Bioinformatics 4, 2 (2003). https://doi.org/10.1186/1471-2105-4-2
 #' @examples
 #' data(demo_ppi)
-#' ppi <- runMCODE(demo_ppi, max_depth = 100)
+#' ppi <- run_mcode(demo_ppi, max_depth = 100)
 #' str(ppi)
 #'
 #' @export
@@ -278,6 +278,7 @@ run_mcode <- function(g,
 #'
 #' @param g An igraph object processed by \code{runMCODE}.
 #' @param only_clusters Logical. If TRUE, returns only nodes that belong to a cluster. Default FALSE.
+#' @param ... Additional arguments passed to `get_mcode_res` when using the deprecated alias `getMCODE_res`.
 #' @importFrom igraph is_igraph vertex_attr_names as_data_frame
 #' @return A data frame with columns:
 #' \item{name}{Gene Symbol / Node Name}
@@ -288,7 +289,7 @@ run_mcode <- function(g,
 #' @examples
 #' data(demo_ppi)
 #' ppi <- runMCODE(demo_ppi, max_depth = 100)
-#' MCODE_res <- getMCODE_res(ppi)
+#' MCODE_res <- get_mcode_res(ppi)
 #' print(head(MCODE_res))
 #' @export
 get_mcode_res <- function(g, only_clusters = FALSE) {
@@ -325,12 +326,14 @@ get_mcode_res <- function(g, only_clusters = FALSE) {
   return(res_df)
 }
 
+#' @rdname get_mcode_res
 #' @export
 getMCODE_res <- function(...) {
   warning("getMCODE_res is deprecated. Please use get_mcode_res instead.")
   get_mcode_res(...)
 }
 
+#' @rdname run_mcode
 #' @export
 runMCODE <- function(...) {
   warning("runMCODE is deprecated. Please use run_mcode instead.")

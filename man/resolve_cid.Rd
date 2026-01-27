@@ -21,9 +21,11 @@ it prefers POSTing the value in the request body to avoid URL length/encoding is
 and falls back to a GET path-style endpoint if needed.
 }
 \examples{
+\dontrun{
 herbs <- c("灵芝")
 lz <- search_herb(herb = herbs, type = "Herb_cn_name")
 lz_mol <- sample(unique(lz$molecule), 5, replace = FALSE)
 lz_mol_cid <- resolve_cid(lz_mol, from = "name")
 print(lz_mol_cid)
+}
 }
