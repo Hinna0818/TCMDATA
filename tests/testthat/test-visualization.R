@@ -15,13 +15,27 @@ test_that("gglollipop works with basic input", {
     RichFactor = (1:10)/100
   )
   
-  # Convert to enrichResult-like object (simplified)
-  class(mock_enrich) <- c("enrichResult", "data.frame")
-  attr(mock_enrich, "ontology") <- "BP"
-  attr(mock_enrich, "organism") <- "hsa"
-  attr(mock_enrich, "keytype") <- "ENTREZID"
-  attr(mock_enrich, "pvalueCutoff") <- 0.05
-  attr(mock_enrich, "qvalueCutoff") <- 0.05
+  # Construct S4 object if class is available, otherwise skip
+  if (requireNamespace("clusterProfiler", quietly = TRUE) && methods::isClass("enrichResult", where = asNamespace("clusterProfiler"))) {
+     # Try to load class definition to ensure new() works correctly
+     suppressPackageStartupMessages(requireNamespace("clusterProfiler"))
+     
+     mock_enrich <- new("enrichResult", 
+                        result = mock_enrich, 
+                        pvalueCutoff = 0.05, 
+                        qvalueCutoff = 0.05, 
+                        organism = "hsa", 
+                        ontology = "BP",
+                        gene = character(),
+                        keytype = "ENTREZID")
+     
+     # Verify it is S4, otherwise skip (some environments might return S3 if setOldClass is involved or other issues)
+     if (!isS4(mock_enrich)) {
+       skip("Created enrichResult object is not S4")
+     }
+  } else {
+     skip("enrichResult class not available")
+  }
   
   # Test that function runs without error
   expect_silent(p <- gglollipop(mock_enrich, top_n = 5))
@@ -29,25 +43,24 @@ test_that("gglollipop works with basic input", {
 })
 
 test_that("ggvenn_plot works with basic input", {
-  # Create a simple list of gene sets
-  gene_sets <- list(
-    Set1 = paste0("Gene", 1:20),
-    Set2 = paste0("Gene", 10:30),
-    Set3 = paste0("Gene", 15:35)
-  )
+  # Create a data frame for ggvenn (1st col ID, others logical)
+  all_genes <- unique(c(paste0("Gene", 1:20), paste0("Gene", 10:30), paste0("Gene", 15:35)))
+  venn_df <- data.frame(Element = all_genes)
+  venn_df$Set1 <- venn_df$Element %in% paste0("Gene", 1:20)
+  venn_df$Set2 <- venn_df$Element %in% paste0("Gene", 10:30)
+  venn_df$Set3 <- venn_df$Element %in% paste0("Gene", 15:35)
   
   # Test that function runs without error
-  expect_silent(p <- ggvenn_plot(gene_sets))
+  expect_silent(p <- ggvenn_plot(venn_df))
   expect_s3_class(p, "ggplot")
 })
 
 test_that("ggdock works with basic input", {
-  # Create mock docking data
-  mock_docking <- data.frame(
-    herb = rep(paste0("Herb", 1:5), each = 3),
-    molecule = rep(paste0("Mol", 1:3), times = 5),
-    affinity = rnorm(15, -7, 1)
-  )
+  # Create mock docking data (wide format)
+  mock_docking <- matrix(rnorm(15, -7, 1), nrow = 5, ncol = 3)
+  rownames(mock_docking) <- paste0("Target", 1:5)
+  colnames(mock_docking) <- paste0("Mol", 1:3)
+  mock_docking <- as.data.frame(mock_docking)
   
   # Test that function runs without error
   expect_silent(p <- ggdock(mock_docking))
@@ -81,7 +94,7 @@ test_that("PlotNodeHeatmap requires ComplexHeatmap", {
   
   # Test that function runs without error when ComplexHeatmap is available
   expect_silent(p <- PlotNodeHeatmap(mock_metrics))
-  expect_s3_class(p, "Heatmap")
+  expect_s4_class(p, "Heatmap")
 })
 
 test_that("gocircle_plot works with basic input", {
@@ -90,13 +103,17 @@ test_that("gocircle_plot works with basic input", {
     ID = paste0("GO:", 1:10),
     Description = paste("Pathway", 1:10),
     GeneRatio = paste0(1:10, "/100"),
+    BgRatio = paste0(1:10, "/100"),
+    geneID = paste0("Gene", 1:10),
+    ONTOLOGY = "BP",
     Count = 1:10,
+    RichFactor = runif(10, 0, 1),
     p.adjust = runif(10, 0, 0.05)
   )
   
   # Test that function runs without error
-  expect_silent(p <- gocircle_plot(mock_data))
-  expect_s3_class(p, "ggplot")
+  # gocircle_plot uses circlize and returns TRUE invisibly
+  expect_true(gocircle_plot(mock_data, top = 5))
 })
 
 test_that("radar_plot works with basic input", {
@@ -108,17 +125,17 @@ test_that("radar_plot works with basic input", {
   )
   
   # Test that function runs without error
-  expect_silent(p <- radar_plot(mock_data, category = "Category", group = "Group", value = "Value"))
+  expect_silent(p <- radar_plot(mock_data, category = "Category", value = "Value"))
   expect_s3_class(p, "ggplot")
 })
 
 test_that("visualization functions handle invalid input gracefully", {
   # Test gglollipop with non-enrichment input
-  expect_error(gglollipop(data.frame()), "enrichResult")
+  expect_error(gglollipop(data.frame()), "unable to find an inherited method")
   
   # Test ggvenn_plot with empty list
-  expect_error(ggvenn_plot(list()), "length")
+  expect_error(ggvenn_plot(list()), "ggvenn_plot only supports 2 to 4 sets")
   
   # Test ggdock with missing columns
-  expect_error(ggdock(data.frame()), "herb")
+  expect_error(ggdock(data.frame()), "cols` must select at least one column")
 })

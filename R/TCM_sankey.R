@@ -14,7 +14,6 @@
 #' @param knot.pos Numeric value (between 0 and 1) determining the curvature position of flow lines. Default is \code{0.3}.
 #'
 #' @import ggplot2
-#' @importFrom ggalluvial geom_stratum geom_flow to_lodes_form
 #' @importFrom dplyr count mutate group_by ungroup arrange select filter lead case_when all_of desc
 #' @importFrom RColorBrewer brewer.pal
 #' @importFrom yulab.utils str_wrap
@@ -40,6 +39,10 @@ TCM_sankey <- function(
     alpha = 0.3,
     knot.pos = 0.3)
 {
+  if (!requireNamespace("ggalluvial", quietly = TRUE)) {
+    stop("Package 'ggalluvial' is required for TCM_sankey(). Please install it.")
+  }
+
   set.seed(2025)
 
   herb_y_high <- mol_y_high <- target_y_high <- 1
@@ -91,7 +94,7 @@ TCM_sankey <- function(
               knot.pos = knot.pos, color = "transparent") +
 
     # herb
-    geom_text(stat = "stratum",
+    geom_text(stat = ggalluvial::StatStratum,
               data = function(x) dplyr::filter(x, .data$axis == "herb"),
               aes(label = ifelse(grepl("spacer_", as.character(after_stat(.data$stratum))), "",
                                  as.character(after_stat(.data$stratum)))),
@@ -99,7 +102,7 @@ TCM_sankey <- function(
               size = font_size, family = plot_font, fontface = font_face) +
 
     # molecule
-    geom_text(stat = "stratum",
+    geom_text(stat = ggalluvial::StatStratum,
               data = function(x) dplyr::filter(x, .data$axis == "molecule"),
               aes(label = ifelse(grepl("spacer_", as.character(after_stat(.data$stratum))), "",
                                  as.character(after_stat(.data$stratum)))),
@@ -107,7 +110,7 @@ TCM_sankey <- function(
               size = font_size, family = plot_font, fontface = font_face) +
 
     # target
-    geom_text(stat = "stratum",
+    geom_text(stat = ggalluvial::StatStratum,
               data = function(x) dplyr::filter(x, .data$axis == "target"),
               aes(label = yulab.utils::str_wrap(
                 ifelse(grepl("spacer_", as.character(after_stat(.data$stratum))), "",

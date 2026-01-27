@@ -44,15 +44,15 @@ getGores <- function(x,
     dplyr::select(dplyr::all_of(c("goterm", "category", "totalnumber", "termnumber", "p.adjust", "rich_factor", "geneID"))) %>%
     tidyr::separate_rows("geneID", sep = "/") %>%
     dplyr::mutate(
-      is_up = if (is.null(up_genes)) NA_integer_ else as.integer(.data$geneID %in% up_genes),
-      is_down = if (is.null(down_genes)) NA_integer_ else as.integer(.data$geneID %in% down_genes))
+      is_up = if (is.null(up_genes)) 0L else as.integer(.data$geneID %in% up_genes),
+      is_down = if (is.null(down_genes)) 0L else as.integer(.data$geneID %in% down_genes))
 
   input_full <- long_df %>%
     dplyr::group_by(.data$goterm, .data$category, .data$totalnumber,
                     .data$termnumber, .data$p.adjust, .data$rich_factor) %>%
     dplyr::summarise(
-      up_regulated = if (all(is.na(.data$is_up))) NA_integer_ else sum(.data$is_up, na.rm = TRUE),
-      down_regulated = if (all(is.na(.data$is_down))) NA_integer_ else sum(.data$is_down, na.rm = TRUE),
+      up_regulated = sum(.data$is_up, na.rm = TRUE),
+      down_regulated = sum(.data$is_down, na.rm = TRUE),
       .groups = "drop") %>%
     dplyr::arrange(.data$category, .data$p.adjust)
 
