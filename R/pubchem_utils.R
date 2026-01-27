@@ -135,7 +135,6 @@ resolve_cid <- function(x, from = c("cid","smiles","inchi","inchikey","name")) {
 #' @param ... Additional arguments passed to internal helper functions.
 #'
 #' @return A tibble with two columns: `compound` and `cid`.
-#' @importFrom webchem get_cid
 #' @importFrom purrr map_chr slowly
 #' @importFrom tibble tibble
 #' @examples
@@ -149,6 +148,10 @@ getcid <- function(compound,
                    pause = 0.25,
                    quiet = TRUE,
                    ...) {
+
+  if (!requireNamespace("webchem", quietly = TRUE)) {
+    stop("Package 'webchem' required for getcid(). Please install with: install.packages('webchem')")
+  }
 
   from  <- match.arg(from)
   match <- match.arg(match)
@@ -174,7 +177,6 @@ getcid <- function(compound,
 #' @param ... Additional arguments passed to internal helper functions.
 
 #' @importFrom purrr slowly rate_delay insistently rate_backoff possibly map
-#' @importFrom webchem pc_prop
 #' @importFrom dplyr mutate
 #' @importFrom tidyr unnest_wider
 #' @importFrom stats na.omit setNames
@@ -198,6 +200,9 @@ getprops <- function(cid,
                        "InChIKey",
                        "XLogP"),
                      ...){
+  if (!requireNamespace("webchem", quietly = TRUE)) {
+    stop("Package 'webchem' required for getprops(). Please install with: install.packages('webchem')")
+  }
   cid <- stats::na.omit(cid)
   slow_prop <- purrr::slowly(
     function(cid) webchem::pc_prop(cid, properties = properties, ...),
@@ -334,7 +339,6 @@ compound_similarity <- function(query,
 
 #' add similarity score of compounds
 #' @param df A tibble result from `compound_similarity`.
-#' @importFrom rcdk parse.smiles get.fingerprint
 #' @importFrom stats setNames
 #' @keywords internal
 add_simscore <- function(df) {

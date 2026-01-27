@@ -13,11 +13,9 @@ Imports:
     dplyr,
     enrichplot,
     forcats,
-    ggalluvial,
     ggfun,
     ggplot2,
     ggrepel,
-    ggvenn,
     grDevices,
     httr,
     igraph,
@@ -28,21 +26,23 @@ Imports:
     paletteer,
     purrr,
     RColorBrewer,
-    rcdk,
     rlang,
     scales,
     stats,
     tibble,
     tidyr,
     utils,
-    webchem,
     yulab.utils
 Suggests:
     ComplexHeatmap,
+    rcdk,
+    webchem,
     ggtangle,
     knitr,
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    ggalluvial,
+    ggvenn
 License: Artistic-2.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
