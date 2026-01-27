@@ -7,18 +7,45 @@ Description: What the package does (one paragraph).
 Depends:
     R (>= 3.5.0)
 Imports:
+    aplot,
+    circlize,
+    clusterProfiler,
     dplyr,
+    enrichplot,
+    forcats,
+    ggfun,
     ggplot2,
+    ggrepel,
+    grDevices,
     httr,
     igraph,
-    MCL,
+    jsonlite,
+    magrittr,
+    Matrix,
+    methods,
+    paletteer,
+    purrr,
+    RColorBrewer,
     rlang,
+    scales,
     stats,
+    tibble,
     tidyr,
     utils,
-    xml2
+    xml2,
+    yulab.utils
+Suggests:
+    ComplexHeatmap,
+    rcdk,
+    webchem,
+    ggtangle,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    ggalluvial,
+    ggvenn
 License: Artistic-2.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 LazyData: true
