@@ -2,6 +2,7 @@
 % Please edit documentation in R/TCM_sankey.R
 \name{tcm_sankey}
 \alias{tcm_sankey}
+\alias{TCM_sankey}
 \title{TCM Sankey Plot for herb-molecule-target}
 \usage{
 tcm_sankey(
@@ -20,6 +21,8 @@ tcm_sankey(
   alpha = 0.3,
   knot.pos = 0.3
 )
+
+TCM_sankey(...)
 }
 \arguments{
 \item{data}{A data frame containing at least three columns: \code{herb}, \code{molecule}, and \code{target}.}
@@ -43,6 +46,8 @@ tcm_sankey(
 \item{alpha}{Numeric value controlling the transparency of the flows. Default is \code{0.3}.}
 
 \item{knot.pos}{Numeric value (between 0 and 1) determining the curvature position of flow lines. Default is \code{0.3}.}
+
+\item{...}{Additional arguments passed to \code{tcm_sankey} when using the deprecated alias \code{TCM_sankey}.}
 }
 \value{
 A \code{ggplot} object representing the herb–compound–target Sankey diagram.

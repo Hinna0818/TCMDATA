@@ -62,11 +62,13 @@ pug_request <- function(path, query = list(), body = NULL, method = c("GET","POS
 #' @return Character vector of CIDs (NA when not found).
 #'
 #' @examples
+#' \dontrun{
 #' herbs <- c("灵芝")
 #' lz <- search_herb(herb = herbs, type = "Herb_cn_name")
 #' lz_mol <- sample(unique(lz$molecule), 5, replace = FALSE)
 #' lz_mol_cid <- resolve_cid(lz_mol, from = "name")
 #' print(lz_mol_cid)
+#' }
 #' @export
 resolve_cid <- function(x, from = c("cid","smiles","inchi","inchikey","name")) {
   from <- match.arg(from)
@@ -142,9 +144,10 @@ resolve_cid <- function(x, from = c("cid","smiles","inchi","inchikey","name")) {
 #' @importFrom purrr map_chr slowly
 #' @importFrom tibble tibble
 #' @examples
+#' \dontrun{
 #' res_smiles <- getcid("CCO", from = "smiles")
 #' print(res_smiles)
-#'
+#' }
 #' @export
 getcid <- function(compound,
                    from = c("name", "smiles", "inchi"),

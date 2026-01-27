@@ -17,27 +17,27 @@
 #' p1 <- plot_node_heatmap(rk_res, select_cols = selected_cols)
 #' print(p1)
 #' @export
-plot_node_heatmap <- function(data, 
-                            id_col = "name", 
-                            select_cols = NULL, 
-                            colors = c("#2166AC", "white", "#B2182B"), 
-                            cluster_rows = TRUE, 
+plot_node_heatmap <- function(data,
+                            id_col = "name",
+                            select_cols = NULL,
+                            colors = c("#2166AC", "white", "#B2182B"),
+                            cluster_rows = TRUE,
                             cluster_cols = FALSE,
                             ...) {
-  
+
   # Check for ComplexHeatmap availability
   if (!requireNamespace("ComplexHeatmap", quietly = TRUE)) {
     stop("Package 'ComplexHeatmap' is required but not installed. Please install it from Bioconductor using: BiocManager::install(\"ComplexHeatmap\")")
   }
-  
+
   if (!id_col %in% colnames(data)) {
     stop(paste("Error: The column", id_col, "does not exist in the input data."))
   }
-  
+
   plot_data <- data
   rownames(plot_data) <- plot_data[[id_col]]
-  plot_data[[id_col]] <- NULL 
-  
+  plot_data[[id_col]] <- NULL
+
   if (!is.null(select_cols)) {
     missing <- setdiff(select_cols, colnames(plot_data))
     if (length(missing) > 0) {
@@ -45,36 +45,37 @@ plot_node_heatmap <- function(data,
     }
     plot_data <- plot_data[, select_cols, drop = FALSE]
   }
-  
+
   is_num <- sapply(plot_data, is.numeric)
   plot_data <- plot_data[, is_num, drop = FALSE]
-  
+
   if (ncol(plot_data) == 0) {
     stop("Error: No numeric columns left to plot after selection.")
   }
-  
+
   # scale data and deal with NA
   mat_scaled <- scale(plot_data)
   mat_scaled[is.na(mat_scaled)] <- 0
-  
+
   # Color Mapping
   col_fun <- circlize::colorRamp2(c(-2, 0, 2), colors)
-  
+
   p <- ComplexHeatmap::Heatmap(matrix = mat_scaled,
                                name = "Z-score",
                                col = col_fun,
                                cluster_rows = cluster_rows,
                                cluster_columns = cluster_cols,
-                               rect_gp = gpar(col = "white", lwd = 1), 
-                               row_names_gp = gpar(fontsize = 12),     
-                               column_names_gp = gpar(fontsize = 10, fontface = "italic"), 
+                               rect_gp = gpar(col = "white", lwd = 1),
+                               row_names_gp = gpar(fontsize = 12),
+                               column_names_gp = gpar(fontsize = 10, fontface = "italic"),
                                column_names_rot = 45,
                                row_dend_width = unit(2, "cm"),
                                ...)
-  
+
   return(p)
 }
 
+#' @rdname plot_node_heatmap
 #' @export
 PlotNodeHeatmap <- function(...) {
   warning("PlotNodeHeatmap is deprecated. Please use plot_node_heatmap instead.")
