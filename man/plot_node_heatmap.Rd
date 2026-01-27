@@ -2,6 +2,7 @@
 % Please edit documentation in R/PlotNodeHeatmap.R
 \name{plot_node_heatmap}
 \alias{plot_node_heatmap}
+\alias{PlotNodeHeatmap}
 \title{Plot PPI nodes metrics Heatmap}
 \usage{
 plot_node_heatmap(
@@ -13,6 +14,8 @@ plot_node_heatmap(
   cluster_cols = FALSE,
   ...
 )
+
+PlotNodeHeatmap(...)
 }
 \arguments{
 \item{data}{A data frame containing the nodes names and metric values.}
