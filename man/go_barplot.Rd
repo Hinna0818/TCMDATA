@@ -6,55 +6,50 @@
 \usage{
 go_barplot(
   enrich_obj,
+  x = "Count",
+  order = TRUE,
   top_n = 10,
   colors = NULL,
-  bar.width = 0.7,
-  text.size = 9,
   label.size = 3.2,
   show_count = TRUE,
+  label.bold = FALSE,
   x.angle = 60,
-  colored.label = FALSE,
   legend.position = "top",
   plot_title = NULL,
-  y_expand = 1.1,
   ...
 )
 }
 \arguments{
-\item{enrich_obj}{An enrichment result object from clusterProfiler::enrichGO(),
-or a data.frame containing at least three columns: ONTOLOGY, Description, and Count.}
+\item{enrich_obj}{An enrichResult object from \code{clusterProfiler::enrichGO()}.}
 
-\item{top_n}{Integer. Number of top enriched terms to display per ontology. Default is 10.}
+\item{x}{Character. The variable to be plotted on the x-axis. Default is "Count".}
 
-\item{colors}{Named character vector. Colors for BP, CC, MF. Default uses "#E64B35", "#4DBBD5", and "#00A087" colors.}
+\item{order}{Logical. Whether to sort \code{x}. Default is TRUE.}
 
-\item{bar.width}{Numeric. Width of bars. Default is 0.7.}
+\item{top_n}{Integer. Number of top terms to display per ontology category. Default is 10.}
 
-\item{text.size}{Numeric. Font size for axis text. Default is 9.}
+\item{colors}{Named character vector for BP, CC, MF colors. Default is \code{c(BP = "#E64B35", CC = "#4DBBD5", MF = "#00A087")}.}
 
 \item{label.size}{Numeric. Font size for count labels on bars. Default is 3.2.}
 
-\item{show_count}{Logical. Whether to display the count value as a text label above each bar. Default is TRUE.}
+\item{show_count}{Logical. Whether to show count labels on bars. Default is TRUE.}
 
-\item{x.angle}{Numeric. Angle of x-axis text. Default is 60.}
+\item{label.bold}{Logical. Whether count labels should be bold. Default is FALSE.}
 
-\item{colored.label}{Logical. Whether to color x-axis labels by ontology.
-Default is FALSE. Note: When TRUE, this uses vectorized input to element_text()
-which may produce a warning in ggplot2 but works correctly.}
+\item{x.angle}{Numeric. Rotation angle of x-axis text (pathway descriptions). Default is 60.}
 
-\item{legend.position}{Character. Position of legend. Default is "top".}
+\item{legend.position}{Character. Position of the legend. Default is "top".}
 
-\item{plot_title}{Character. Optional plot title. Default is NULL.}
+\item{plot_title}{Character or NULL. Title of the plot. Default is NULL.}
 
-\item{y_expand}{Numeric. Expansion factor for y-axis upper limit. Default is 1.1.}
-
-\item{...}{Additional arguments (currently unused).}
+\item{...}{Additional parameters if neccessary.}
 }
 \value{
-A \code{ggplot} object showing a bar-style GO enrichment plot.
+A ggplot2 object.
 }
 \description{
-Bar Plot for GO Enrichment Results
+Create a bar plot for GO enrichment analysis results, with bars colored
+by ontology category (BP, CC, MF). Based on barplot method from enrichplot.
 }
 \examples{
 \dontrun{
@@ -70,14 +65,5 @@ x <- enrichGO(g, ont="all", OrgDb='org.Hs.eg.db', keyType="SYMBOL")
 p1 <- go_barplot(x)
 print(p1)
 
-## Or use a custom data.frame
-df <- data.frame(
-  ONTOLOGY = c("BP", "BP", "CC", "MF"),
-  Description = c("term1", "term2", "term3", "term4"),
-  Count = c(10, 8, 15, 12)
-)
-p2 <- go_barplot(df)
-print(p2)
 }
-
 }

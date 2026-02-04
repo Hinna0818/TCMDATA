@@ -1,28 +1,30 @@
 #' Bar Plot for GO Enrichment Results
 #'
-#' @param enrich_obj An enrichment result object from clusterProfiler::enrichGO(),
-#'   or a data.frame containing at least three columns: ONTOLOGY, Description, and Count.
-#' @param top_n Integer. Number of top enriched terms to display per ontology. Default is 10.
-#' @param colors Named character vector. Colors for BP, CC, MF. Default uses "#E64B35", "#4DBBD5", and "#00A087" colors.
-#' @param bar.width Numeric. Width of bars. Default is 0.7.
-#' @param text.size Numeric. Font size for axis text. Default is 9.
-#' @param label.size Numeric. Font size for count labels on bars. Default is 3.2.
-#' @param show_count Logical. Whether to display the count value as a text label above each bar. Default is TRUE.
-#' @param x.angle Numeric. Angle of x-axis text. Default is 60.
-#' @param colored.label Logical. Whether to color x-axis labels by ontology.
-#'   Default is FALSE. Note: When TRUE, this uses vectorized input to element_text()
-#'   which may produce a warning in ggplot2 but works correctly.
-#' @param legend.position Character. Position of legend. Default is "top".
-#' @param plot_title Character. Optional plot title. Default is NULL.
-#' @param y_expand Numeric. Expansion factor for y-axis upper limit. Default is 1.1.
-#' @param ... Additional arguments (currently unused).
+#' Create a bar plot for GO enrichment analysis results, with bars colored
+#' by ontology category (BP, CC, MF). Based on barplot method from enrichplot.
 #'
-#' @return A `ggplot` object showing a bar-style GO enrichment plot.
+#' @param enrich_obj An enrichResult object from \code{clusterProfiler::enrichGO()}.
+#' @param x Character. The variable to be plotted on the x-axis. Default is "Count".
+#' @param order Logical. Whether to sort `x`. Default is TRUE.
+#' @param top_n Integer. Number of top terms to display per ontology category. Default is 10.
+#' @param colors Named character vector for BP, CC, MF colors. Default is \code{c(BP = "#E64B35", CC = "#4DBBD5", MF = "#00A087")}.
+#' @param label.size Numeric. Font size for count labels on bars. Default is 3.2.
+#' @param show_count Logical. Whether to show count labels on bars. Default is TRUE.
+#' @param label.bold Logical. Whether count labels should be bold. Default is FALSE.
+#' @param x.angle Numeric. Rotation angle of x-axis text (pathway descriptions). Default is 60.
+#' @param legend.position Character. Position of the legend. Default is "top".
+#' @param plot_title Character or NULL. Title of the plot. Default is NULL.
+#' @param ... Additional parameters if neccessary.
+#'
+#' @return A ggplot2 object.
 #'
 #' @import ggplot2
-#' @importFrom dplyr select mutate group_by slice_max ungroup arrange desc all_of %>%
+#' @import enrichplot
+#' @importFrom graphics barplot
+#' @importFrom dplyr group_by slice_max ungroup mutate arrange desc %>%
 #' @importFrom rlang .data
-#' @importFrom scales pretty_breaks
+#'
+#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -38,165 +40,100 @@
 #' p1 <- go_barplot(x)
 #' print(p1)
 #'
-#' ## Or use a custom data.frame
-#' df <- data.frame(
-#'   ONTOLOGY = c("BP", "BP", "CC", "MF"),
-#'   Description = c("term1", "term2", "term3", "term4"),
-#'   Count = c(10, 8, 15, 12)
-#' )
-#' p2 <- go_barplot(df)
-#' print(p2)
 #' }
-#'
-#' @export
-
 go_barplot <- function(enrich_obj,
+                       x = "Count",
+                       order = TRUE,
                        top_n = 10,
                        colors = NULL,
-                       bar.width = 0.7,
-                       text.size = 9,
                        label.size = 3.2,
                        show_count = TRUE,
+                       label.bold = FALSE,
                        x.angle = 60,
-                       colored.label = FALSE,
                        legend.position = "top",
                        plot_title = NULL,
-                       y_expand = 1.1,
                        ...) {
 
-  # Check input data and extract result
-  required_cols <- c("ONTOLOGY", "Description", "Count")
-
-  if (is.data.frame(enrich_obj)) {
-    # User provided a data.frame
-    missing_cols <- setdiff(required_cols, colnames(enrich_obj))
-    if (length(missing_cols) > 0) {
-      stop("Input data.frame is missing required columns: ",
-           paste(missing_cols, collapse = ", "),
-           "\nRequired columns are: ONTOLOGY, Description, Count",
-           call. = FALSE)
-    }
-    go_res <- enrich_obj
-  } else if (inherits(enrich_obj, "enrichResult")) {
-    # clusterProfiler enrichResult object
-    go_res <- enrich_obj@result
-  } else {
-    stop("enrich_obj must be either a clusterProfiler enrichResult object ",
-         "or a data.frame with columns: ONTOLOGY, Description, Count",
-         call. = FALSE)
+  # Check input
+  if (!inherits(enrich_obj, "enrichResult")) {
+    stop("enrich_obj must be an enrichResult object", call. = FALSE)
   }
 
-  # Check for empty data
-  if (nrow(go_res) == 0) {
-    stop("Input data contains no rows.", call. = FALSE)
-  }
-
-  # Use default colors if necessary
+  # Default colors
   if (is.null(colors)) {
-    colors <- c(
-      "BP" = "#E64B35",
-      "CC" = "#4DBBD5",
-      "MF" = "#00A087"
-    )
+    colors <- c("BP" = "#E64B35", "CC" = "#4DBBD5", "MF" = "#00A087")
   }
 
-  # Label mapping for legend
   label_mapping <- c(
     "BP" = "Biological Process",
     "CC" = "Cellular Component",
     "MF" = "Molecular Function"
   )
 
-  # Process data
-  plot_data <- go_res %>%
-    select(all_of(required_cols)) %>%
-    mutate(Count = as.numeric(.data$Count)) %>%
-    group_by(.data$ONTOLOGY) %>%
-    slice_max(order_by = .data$Count, n = top_n, with_ties = FALSE) %>%
-    ungroup() %>%
-    arrange(.data$ONTOLOGY, desc(.data$Count)) %>%
-    mutate(Description = factor(.data$Description, levels = .data$Description))
+  # Use barplot method from enrichplot
+  p <- graphics::barplot(enrich_obj,
+                         x = x,
+                         showCategory = top_n,
+                         split = "ONTOLOGY",
+                         order = order,
+                         ...)
 
-  # Check for empty plot data after filtering
-  if (nrow(plot_data) == 0) {
-    stop("No data remaining after filtering.", call. = FALSE)
+  # Get data from barplot object and reorder
+  df <- p$data
+  if (!"ONTOLOGY" %in% colnames(df)) {
+    stop("No ONTOLOGY column found. Please use enrichGO(ont='ALL').")
   }
 
-  # Build plot
-  p <- ggplot(data = plot_data, aes(x = .data$Description, y = .data$Count, fill = .data$ONTOLOGY)) +
-    geom_bar(stat = "identity", position = position_dodge(width = bar.width), width = bar.width)
+  xcol <- x
 
-  # Add count labels if requested
+  # Reorder
+  df <- df %>%
+    mutate(ONTOLOGY = factor(.data$ONTOLOGY, levels = c("BP", "CC", "MF"))) %>%
+    arrange(.data$ONTOLOGY, desc(.data[[xcol]]))
+
+  desired_order <- df$Description
+
+  # update
+  p <- p + df
+
+  p <- p +
+    aes(fill = .data$ONTOLOGY) +
+    scale_fill_manual(values = colors, labels = label_mapping, name = NULL) +
+    coord_flip() +
+    scale_y_discrete(limits = desired_order)
+
+  # Create color mapping matching the plot order
+  label_colors <- sapply(desired_order, function(desc) {
+    ont <- as.character(df$ONTOLOGY[df$Description == desc][1])
+    colors[ont]
+  })
+
+  # Add count labels on top of bars
   if (show_count) {
     p <- p + geom_text(
-      aes(label = .data$Count),
-      position = position_dodge(width = bar.width),
-      vjust = -0.5,
+      aes(label = .data[[xcol]]),
+      vjust = -0.3,
       size = label.size,
-      fontface = "bold"
+      fontface = if (label.bold) "bold" else "plain"
     )
   }
 
-  # Determine x-axis label color
-  if (colored.label) {
-    x_label_color <- colors[plot_data$ONTOLOGY]
-  } else {
-    x_label_color <- "black"
-  }
-
-  # Apply scales and theme
+  # update layout
   p <- p +
-    scale_fill_manual(values = colors, labels = label_mapping) +
-    theme_minimal(base_size = 11) +
     theme(
-      axis.text.x = element_text(
-        angle = x.angle,
-        hjust = 1,
-        vjust = 1,
-        size = text.size,
-        face = "bold"
-      ),
-      axis.ticks.x = element_line(color = "black"),
-      axis.title.y = element_text(
-        margin = margin(r = 10),
-        face = "bold",
-        size = text.size + 2
-      ),
-      axis.line.y = element_line(color = "black", linewidth = 0.5),
-      axis.ticks.y = element_line(color = "black"),
-      axis.text.y = element_text(margin = margin(r = 5), size = text.size + 1),
+      axis.text.x = element_text(angle = x.angle, hjust = 1, vjust = 1,
+                                 color = label_colors, face  = if (label.bold) "bold" else "plain"),
       panel.grid = element_blank(),
+      panel.border = element_blank(),
+      axis.line.y = element_line(color = "black"),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
       legend.position = legend.position,
-      legend.title = element_blank(),
-      legend.key.size = unit(5, "mm"),
-      legend.text = element_text(size = text.size + 1),
-      legend.justification = "center",
-      legend.spacing.x = unit(8, "mm"),
-      plot.margin = margin(10, 15, 10, 10, unit = "mm"),
-      plot.background = element_rect(fill = "white", color = NA),
-      plot.title = element_text(size = text.size + 3, face = "bold", hjust = 0.5)
+      plot.margin = margin(t = 5, r = 20, b = 5, l = 60, unit = "pt")
     ) +
-    labs(x = "", y = "Number of Genes") +
-    scale_y_continuous(
-      limits = c(0, max(plot_data$Count) * y_expand),
-      breaks = scales::pretty_breaks(n = 5),
-      expand = expansion(mult = c(0, 0))
-    )
+    scale_x_continuous(expand = expansion(mult = c(0, 0.1)))
 
-  # Apply colored x-axis labels using ggplot_build (CRAN-compliant approach)
-  if (colored.label) {
-    p <- p + theme(axis.text.x = element_text(
-      angle = x.angle,
-      hjust = 1,
-      vjust = 1,
-      size = text.size,
-      face = "bold",
-      color = x_label_color
-    ))
-  }
-
-  # Add title if provided
-  if (!is.null(plot_title)) {
+  if (!is.null(plot_title)){
     p <- p + ggtitle(plot_title)
   }
 
