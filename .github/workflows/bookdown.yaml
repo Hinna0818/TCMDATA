@@ -19,83 +19,35 @@ jobs:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      # 1. Checkout docs branch (contains docs/)
+      # 1. Checkout docs branch
       - name: Checkout docs branch
         uses: actions/checkout@v4
         with:
           ref: docs/rpkg-usage
-          path: docs-src
 
-      # 2. Checkout package source (master branch)
-      - name: Checkout package source (master)
-        uses: actions/checkout@v4
-        with:
-          ref: master
-          path: pkg-src
-
-      # 3. Setup pandoc
+      # 2. Setup pandoc
       - uses: r-lib/actions/setup-pandoc@v2
 
-      # 4. Setup R
+      # 3. Setup R
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "release"
           use-public-rspm: true
 
-      # 5. Install system dependencies
-      - name: Install system dependencies
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libcurl4-openssl-dev \
-            libssl-dev \
-            libxml2-dev \
-            libharfbuzz-dev \
-            libfribidi-dev \
-            libglpk-dev
-
-      # 6. Install R dependencies + TCMDATA package
+      # 4. Install bookdown and rendering dependencies
       - name: Install R dependencies
         run: |
-          Rscript -e 'install.packages(c("remotes", "BiocManager", "bookdown", "rmarkdown", "knitr"))'
-          Rscript -e 'BiocManager::install(c("clusterProfiler", "enrichplot"), ask = FALSE, update = FALSE)'
-          Rscript -e 'remotes::install_deps("pkg-src", dependencies = TRUE, upgrade = "never")'
-          R CMD INSTALL pkg-src
-          Rscript -e 'stopifnot(requireNamespace("TCMDATA", quietly = TRUE))'
+          Rscript -e 'install.packages(c("bookdown", "rmarkdown", "knitr"))'
 
-      # 7. Detect bookdown directory
-      - name: Detect book directory
-        shell: bash
-        run: |
-          set -euo pipefail
-          BOOKDIR="docs-src/docs"
-          if [ ! -f "$BOOKDIR/_bookdown.yml" ]; then
-            echo "No _bookdown.yml found under $BOOKDIR" >&2
-            ls -la "$BOOKDIR" >&2
-            exit 1
-          fi
-          if [ ! -f "$BOOKDIR/index.Rmd" ]; then
-            echo "No index.Rmd found under $BOOKDIR" >&2
-            ls -la "$BOOKDIR" >&2
-            exit 1
-          fi
-          echo "BOOKDIR=$BOOKDIR" >> "$GITHUB_ENV"
-
-      # 8. Build the book
+      # 5. Build the book
       - name: Build book
         run: |
           Rscript -e '
-            ws      <- Sys.getenv("GITHUB_WORKSPACE")
-            bookdir <- Sys.getenv("BOOKDIR")
-            bookdir_abs <- normalizePath(file.path(ws, bookdir), mustWork = TRUE)
-            outdir  <- file.path(ws, "site")
-            dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
-            setwd(bookdir_abs)
-            bookdown::render_book("index.Rmd", output_dir = outdir)
+            setwd("docs")
+            bookdown::render_book("index.Rmd", output_dir = "../site")
           '
 
-      # 9. Deploy to gh-pages branch
+      # 6. Deploy to gh-pages branch
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
