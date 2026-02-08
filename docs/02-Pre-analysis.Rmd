@@ -1,0 +1,9 @@
+# Pre-analysis {#pre-analysis}
+
+This chapter covers data cleaning and preprocessing steps before analysis.
+
+## Suggested workflow
+
+- Data filtering
+- Identifier normalization
+- Deduplication

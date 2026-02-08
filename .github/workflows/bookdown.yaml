@@ -1,0 +1,205 @@
+name: bookdownname: bookdown
+
+
+    steps:
+      # 1. Checkout docs branch (contains docs/)
+
+  push:  push:
+
+    branches:    branches:
+
+      - docs/rpkg-usage      - docs
+      # 2. Checkout package source (master branch)
+      - devel
+
+permissions:
+
+  contents: writepermissions:
+
+      # 3. Setup pandoc
+
+concurrency:
+      # 4. Setup R
+  group: bookdown-${{ github.ref }}concurrency:
+
+  cancel-in-progress: true  group: bookdown-${{ github.ref }}
+
+  cancel-in-progress: true
+      # 5. Install system dependencies
+jobs:
+
+  build-deploy:jobs:
+
+    runs-on: ubuntu-latest  build-deploy:
+
+    env:    runs-on: ubuntu-latest
+
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}    env:
+
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+      # 6. Install R dependencies + TCMDATA package
+
+      # 1. 检出文档分支（含 docs/ 目录）
+
+      - name: Checkout docs branch    steps:
+
+        uses: actions/checkout@v4      - name: Checkout docs branch
+
+        with:        uses: actions/checkout@v4
+      # 7. Detect bookdown directory
+          ref: docs/rpkg-usage        with:
+
+          path: docs-src          ref: docs
+
+          path: docs-src
+
+      # 2. 检出包源码（master 分支）
+
+      - name: Checkout package source (master)      - name: Checkout package source (devel)
+
+        uses: actions/checkout@v4        uses: actions/checkout@v4
+
+        with:        with:
+
+          ref: master          ref: devel
+
+          path: pkg-src          path: sclet-src
+      # 8. Build the book
+
+
+      # 3. 安装 pandoc      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+
+      # 4. 安装 R        with:
+
+      - uses: r-lib/actions/setup-r@v2          r-version: "release"
+
+      # 9. Deploy to gh-pages branch
+
+          r-version: "release"
+
+          use-public-rspm: true      - name: Install system dependencies
+
+        shell: bash
+
+      # 5. 安装系统级依赖        run: |
+
+      - name: Install system dependencies          sudo apt-get update
+
+        shell: bash          sudo apt-get install -y \
+
+        run: |            libcurl4-openssl-dev \
+
+          sudo apt-get update            libssl-dev \
+
+          sudo apt-get install -y \            libxml2-dev \
+
+            libcurl4-openssl-dev \            libharfbuzz-dev \
+
+            libssl-dev \            libfribidi-dev \
+
+            libxml2-dev \            liblz4-dev \
+
+            libharfbuzz-dev \            libzstd-dev \
+
+            libfribidi-dev \            zlib1g-dev
+
+            libglpk-dev          if ! ldconfig -p | grep -q 'libglpk\.so\.40'; then
+
+            sudo apt-get install -y libglpk40 || sudo apt-get install -y libglpk40t64 || sudo apt-get install -y libglpk-dev
+
+      # 6. 安装 R 依赖 + TCMDATA 包          fi
+
+      - name: Install R dependencies
+
+        run: |      - name: Install dependencies
+
+          Rscript -e 'install.packages(c("remotes", "BiocManager", "bookdown", "rmarkdown", "knitr"))'        run: |
+
+          Rscript -e 'BiocManager::install(c("clusterProfiler", "enrichplot"), ask = FALSE, update = FALSE)'          Rscript -e 'install.packages(c("remotes","BiocManager"))'
+
+          Rscript -e 'remotes::install_deps("pkg-src", dependencies = TRUE, upgrade = "never")'          Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); install.packages(c("bookdown","rmarkdown","knitr","qs","shadowtext","conflicted","aplot","ggplot2","ggsc","yulab.utils","pkgbuild"))'
+
+          R CMD INSTALL pkg-src          Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); if (!requireNamespace("qs", quietly = TRUE)) remotes::install_github("qsbase/qs", upgrade = "never"); stopifnot(requireNamespace("qs", quietly = TRUE))'
+
+          Rscript -e 'stopifnot(requireNamespace("TCMDATA", quietly = TRUE))'          Rscript -e 'BiocManager::install(c("clusterProfiler","scater","scran","scuttle","TENxPBMCData","scRNAseq","MouseThymusAgeing","SingleR","celldex","DropletUtils","SingleCellExperiment","SummarizedExperiment","velociraptor","SpatialExperiment","enrichplot","org.Mm.eg.db","org.Hs.eg.db","batchelor","iSEE"), ask = FALSE, update = FALSE)'
+
+          Rscript -e 'remotes::install_github(c("immunogenomics/presto", "GfellerLab/SuperCell"), upgrade = "never")'
+
+      # 7. 定位 bookdown 目录          Rscript -e 'remotes::install_deps("sclet-src", dependencies = c("Depends","Imports","LinkingTo"), upgrade = "never")'
+
+      - name: Detect book directory          R CMD INSTALL sclet-src
+
+        shell: bash          Rscript -e 'stopifnot(requireNamespace("sclet", quietly = TRUE))'
+
+        run: |
+
+          set -euo pipefail      - name: Detect book directory
+
+          BOOKDIR="docs-src/docs"        shell: bash
+
+          if [ ! -f "$BOOKDIR/_bookdown.yml" ]; then        run: |
+
+            echo "No _bookdown.yml found under $BOOKDIR" >&2          set -euo pipefail
+
+            ls -la "$BOOKDIR" >&2          BOOKDOWN_YML=$(find docs-src -maxdepth 6 -name '_bookdown.yml' -print -quit || true)
+
+            exit 1          if [ -z "$BOOKDOWN_YML" ]; then
+
+          fi            echo "No _bookdown.yml found in docs branch checkout (docs-src)." >&2
+
+          if [ ! -f "$BOOKDIR/index.Rmd" ]; then            echo "docs-src top-level contents:" >&2
+
+            echo "No index.Rmd found under $BOOKDIR" >&2            ls -la docs-src >&2
+
+            ls -la "$BOOKDIR" >&2            exit 1
+
+            exit 1          fi
+
+          fi          BOOKDIR=$(dirname "$BOOKDOWN_YML")
+
+          echo "BOOKDIR=$BOOKDIR" >> "$GITHUB_ENV"          echo "BOOKDIR=$BOOKDIR" >> "$GITHUB_ENV"
+
+          if [ ! -f "$BOOKDIR/index.Rmd" ]; then
+
+      # 8. 构建书籍            echo "No index.Rmd found under $BOOKDIR" >&2
+
+      - name: Build book            ls -la "$BOOKDIR" >&2
+
+        run: |            exit 1
+
+          Rscript -e '          fi
+
+            ws      <- Sys.getenv("GITHUB_WORKSPACE")
+
+            bookdir <- Sys.getenv("BOOKDIR")      - name: Build site
+
+            bookdir_abs <- normalizePath(file.path(ws, bookdir), mustWork = TRUE)        run: |
+
+            outdir  <- file.path(ws, "site")          Rscript -e 'ws <- Sys.getenv("GITHUB_WORKSPACE"); bookdir <- Sys.getenv("BOOKDIR"); bookdir_abs <- normalizePath(file.path(ws, bookdir), mustWork = TRUE); outdir <- file.path(ws, "site"); dir.create(outdir, recursive = TRUE, showWarnings = FALSE); setwd(bookdir_abs); bookdown::render_book("index.Rmd", output_dir = outdir)'
+
+            dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+
+            setwd(bookdir_abs)      - name: Deploy to gh-pages
+
+            bookdown::render_book("index.Rmd", output_dir = outdir)        uses: peaceiris/actions-gh-pages@v4
+
+          '        with:
+
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 9. 部署到 gh-pages 分支          publish_dir: ./site
+
+      - name: Deploy to gh-pages          publish_branch: gh-pages
+
+        uses: peaceiris/actions-gh-pages@v4          force_orphan: true
+
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          force_orphan: true

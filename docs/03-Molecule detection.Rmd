@@ -1,0 +1,9 @@
+# Molecule detection {#molecule-detection}
+
+This chapter describes molecule detection and annotation workflows.
+
+## Topics
+
+- SMILES parsing
+- PubChem queries
+- Similarity filtering
