@@ -4,7 +4,6 @@ author: "Yulab-SMU"
 date: "`r Sys.Date()`"
 site: bookdown::bookdown_site
 documentclass: book
-bibliography: []
 description: |
   TCMDATA user guide. Covers installation, core features, and common workflows.
 link-citations: yes
