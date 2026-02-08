@@ -1,0 +1,9 @@
+# Other resources {#other-resources}
+
+This chapter introduces additional resources and datasets.
+
+## Topics
+
+- TF–target interactions
+- Gut microbiota–metabolite links
+- External databases

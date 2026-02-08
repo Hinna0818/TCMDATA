@@ -1,0 +1,12 @@
+# Load TCM Data {#load-data}
+
+This chapter documents data loading workflows in TCMDATA.
+
+## Core functions
+
+- `search_herb()`
+- `search_target()`
+
+## Output
+
+Describe the returned tables, key fields, and expected formats here.

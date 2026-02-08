@@ -4,3 +4,10 @@
 .Rhistory
 *.RData
 *.Rhistory
+
+# bookdown build artifacts
+docs/_book/
+docs/_bookdown_files/
+docs/*.md
+!docs/*.Rmd
+site/
