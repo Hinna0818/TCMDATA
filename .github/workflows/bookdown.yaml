@@ -42,12 +42,12 @@ jobs:
       # 5. Build the book
       - name: Build book
         run: |
+          cd docs
           Rscript -e '
-            bookdir <- normalizePath("docs")
-            outdir  <- normalizePath("site", mustWork = FALSE)
-            dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
-            setwd(bookdir)
-            bookdown::render_book("index.Rmd", output_format = "bookdown::gitbook", output_dir = outdir)
+            output_dir <- file.path(normalizePath(".."), "site")
+            message("Building book to: ", output_dir)
+            bookdown::render_book("index.Rmd", output_format = "bookdown::gitbook", output_dir = output_dir)
+            list.files(output_dir, recursive = TRUE)
           '
 
       # 6. Deploy to gh-pages branch
