@@ -175,6 +175,85 @@ run_louvain <- function(g, resolution = 1.0, weights = NULL) {
 }
 
 
+#' Compute Fast Greedy Clustering for PPI Network
+#'
+#' This function performs fast greedy modularity optimization on an igraph object.
+#' It is suitable for detecting communities in undirected PPI networks.
+#'
+#' @param g An \code{igraph} object.
+#' @param weights Numeric vector, character, NULL, or NA. Edge weights to use for
+#'   clustering. If NULL (default), the function attempts to use the \code{weight}
+#'   edge attribute first, then the \code{score} edge attribute. If a character
+#'   value is supplied, it is treated as the edge attribute name. Set to NA to
+#'   perform unweighted clustering.
+#'
+#' @return The input \code{igraph} object with a new vertex attribute \code{fastgreedy_cluster}.
+#' @importFrom igraph cluster_fast_greedy V edge_attr_names E membership ecount
+#'
+#' @examples
+#' data(demo_ppi)
+#' library(igraph)
+#' ppi <- run_fastgreedy(demo_ppi)
+#' head(V(ppi)$fastgreedy_cluster)
+#'
+#' @export
+run_fastgreedy <- function(g, weights = NULL) {
+
+  stopifnot(inherits(g, "igraph"))
+
+  if (igraph::is_directed(g)) {
+    stop("Fast greedy clustering requires an undirected graph. Please convert the PPI graph with igraph::as_undirected() first.")
+  }
+
+  if (igraph::ecount(g) == 0) {
+    warning("Graph has no edges. Assigning each node to its own fast greedy cluster.")
+    igraph::V(g)$fastgreedy_cluster <- as.factor(seq_len(igraph::vcount(g)))
+    return(g)
+  }
+
+  # PPI networks often use 'weight' or STRING-style 'score' as confidence scores.
+  if (is.null(weights)) {
+    edge_attrs <- igraph::edge_attr_names(g)
+    if ("weight" %in% edge_attrs) {
+      weights <- igraph::E(g)$weight
+      message("Using edge attribute 'weight' for clustering.")
+    } else if ("score" %in% edge_attrs) {
+      weights <- igraph::E(g)$score
+      message("Using edge attribute 'score' for clustering.")
+    } else {
+      weights <- NULL
+      message("No weights found. Running unweighted clustering.")
+    }
+  } else if (identical(weights, NA)) {
+    weights <- NULL
+  } else if (is.character(weights) && length(weights) == 1) {
+    weight_attr <- weights
+    if (!weight_attr %in% igraph::edge_attr_names(g)) {
+      stop(sprintf("Edge attribute '%s' not found in the graph.", weight_attr))
+    }
+    weights <- igraph::edge_attr(g, weight_attr)
+    message(sprintf("Using edge attribute '%s' for clustering.", weight_attr))
+  }
+
+  if (!is.null(weights) && length(weights) != igraph::ecount(g)) {
+    stop("Length of 'weights' must match the number of edges in the graph.")
+  }
+
+  message("Running fast greedy clustering...")
+
+  fg_res <- igraph::cluster_fast_greedy(g, weights = weights)
+
+  igraph::V(g)$fastgreedy_cluster <- as.factor(igraph::membership(fg_res))
+  num_clusters <- length(unique(igraph::membership(fg_res)))
+  modularity_score <- max(fg_res$modularity, na.rm = TRUE)
+
+  message(sprintf("Done! Identified %d modules (Modularity: %.3f).",
+                  num_clusters, modularity_score))
+
+  return(g)
+}
+
+
 #' Score and Rank Network Clusters
 #'
 #' This function evaluates the clusters/modules identified in the graph.
@@ -253,4 +332,3 @@ Addclusterscore <- function(...) {
   warning("Addclusterscore is deprecated. Please use add_cluster_score instead.")
   add_cluster_score(...)
 }
-
