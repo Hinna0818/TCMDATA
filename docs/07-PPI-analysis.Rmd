@@ -154,7 +154,7 @@ plot_node_heatmap(rank_df, select_cols = selected_cols)
 
 ## Community detection {#clustering}
 
-Identifying densely connected subnetworks (modules) helps reveal functional protein complexes and signaling cascades. `TCMDATA` supports three complementary algorithms.
+Identifying densely connected subnetworks (modules) helps reveal functional protein complexes and signaling cascades. `TCMDATA` supports four complementary algorithms.
 
 ### Louvain modularity optimization
 
@@ -197,6 +197,25 @@ head(mcl_scores)
 ```
 
 The `inflation` parameter controls cluster granularity: higher values (e.g., 3–5) yield tighter, more granular clusters; lower values (e.g., 1.5–2) produce larger, more inclusive modules.
+
+### Fast greedy modularity optimization
+
+The fast greedy algorithm<sup>[5]</sup> detects communities by greedily optimizing network modularity. It starts with each node as an individual community, then repeatedly merges the pair of communities that produces the largest modularity gain. This bottom-up strategy is efficient for undirected networks and provides a simple modularity-based alternative to Louvain for PPI module detection.
+
+`TCMDATA` implements this workflow through `run_fastgreedy()`, which calls `igraph::cluster_fast_greedy()` and writes the resulting membership labels back to the graph as `fastgreedy_cluster`. By default, the function uses the edge attribute `weight` as the confidence score; if `weight` is absent, it falls back to the STRING-style `score` attribute. Users can also provide a custom weight vector or set `weights = NA` for unweighted clustering.
+
+```{r ppi-fastgreedy, eval=TRUE, collapse=FALSE}
+ppi_fastgreedy <- run_fastgreedy(ppi_scored)
+fastgreedy_scores <- add_cluster_score(
+  ppi_fastgreedy,
+  cluster_attr = "fastgreedy_cluster",
+  min_size = 3
+)
+
+head(fastgreedy_scores)
+```
+
+The `weights` parameter controls whether PPI confidence scores contribute to modularity optimization. For example, `weights = "score"` explicitly uses the `score` edge attribute, while `weights = NA` performs unweighted fast greedy clustering.
 
 ## PPI network robustness analysis {#robustness}
 
@@ -281,7 +300,7 @@ plot_list(p_before, p_after, ncol = 2, labels = c("A", "B"))
 
 High-quality network visualization is essential for interpreting PPI analysis results and preparing publication-ready figures. While Cytoscape remains a popular choice for network visualization, it requires manual GUI operations that are difficult to reproduce and integrate into automated workflows.
 
-`ggtangle`<sup>[5]</sup> addresses these limitations by providing a `ggplot2`-native framework for network rendering. Key advantages include:
+`ggtangle`<sup>[7]</sup> addresses these limitations by providing a `ggplot2`-native framework for network rendering. Key advantages include:
 
 - **Full `ggplot2` compatibility** — Seamless integration with the grammar of graphics; supports all `ggplot2` themes, scales, and annotations.
 - **Reproducibility** — All visualizations are generated programmatically, ensuring consistent results across runs.
@@ -395,10 +414,11 @@ plot_list(p_fr, p_kk, p_nicely, p_star, ncol = 2, labels = c("A", "B", "C", "D")
 
 4. van Dongen S. Graph clustering via a discrete uncoupling process. *SIAM Journal on Matrix Analysis and Applications* (2008), 30(1), 121–141. doi: [10.1137/040608635](https://doi.org/10.1137/040608635).
 
-5. Yu G. ggtangle: Draw Network and Phylogenetic Tree Using Grammar of Graphics. R package. doi: [10.32614/CRAN.package.ggtangle](https://doi.org/10.32614/CRAN.package.ggtangle).
+5. Clauset A, Newman MEJ, Moore C. Finding community structure in very large networks. *Physical Review E* (2004), 70(6), 066111. doi: [10.1103/PhysRevE.70.066111](https://doi.org/10.1103/PhysRevE.70.066111).
 
 6. Xi Y, et al. Exploration of the Specific Pathology of HXMM Tablet Against Retinal Injury Based on Drug Attack Model to Network Robustness. *Frontiers in Pharmacology* (2022), 13, 826535. doi: [10.3389/fphar.2022.826535](https://doi.org/10.3389/fphar.2022.826535).
 
+7. Yu G. ggtangle: Draw Network and Phylogenetic Tree Using Grammar of Graphics. R package. doi: [10.32614/CRAN.package.ggtangle](https://doi.org/10.32614/CRAN.package.ggtangle).
 ---
 
 ## Session information
