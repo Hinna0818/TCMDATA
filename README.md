@@ -72,7 +72,7 @@ TCMDATA integrates an AI agent layer via [aisdk](https://github.com/YuLab-SMU/ai
 
 ```r
 # One-time setup
-devtools::install_github("YuLab-SMU/aisdk")
+install.packages("aisdk")
 
 tcm_setup(
   provider = "openai",

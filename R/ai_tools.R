@@ -255,6 +255,7 @@ create_tcm_tools <- function(task_type = NULL, tool_names = NULL) {
       params = params
     )
   )
+  .export_tcm_artifact(artifact$artifact_id)
 
   base <- list(
     ok = TRUE,
@@ -2511,6 +2512,7 @@ tool_eval_r_code <- function() {
       "Execute a short R code snippet and return the output.",
       "The code runs in a sandboxed environment with access to base R, dplyr, and purrr.",
       "Variables from the user's globalenv() are accessible read-only.",
+      "TCMDATA artifact IDs returned by earlier tools are also available as variables.",
       "Use this for data transformations the user requests that no existing tool handles,",
       "such as subsetting, filtering, basic statistics, or preparing data for other tools.",
       "Keep code short (< 20 lines). Do NOT use this to install packages or write files."
@@ -2527,6 +2529,8 @@ tool_eval_r_code <- function() {
           return(list(ok = FALSE, error = "Code cannot be empty."))
         }
 
+        .export_tcm_artifacts()
+
         # Lazy-init sandbox with globalenv as parent for read access
         if (is.null(sandbox)) {
           sandbox <<- aisdk::SandboxManager$new(
@@ -2536,6 +2540,9 @@ tool_eval_r_code <- function() {
         }
 
         output <- sandbox$execute(code)
+        if (grepl("^Error executing R code:", output)) {
+          return(list(ok = FALSE, error = output))
+        }
         list(ok = TRUE, output = output)
       }, error = function(e) {
         list(ok = FALSE, error = conditionMessage(e))

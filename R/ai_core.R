@@ -12,7 +12,7 @@
   if (!requireNamespace("aisdk", quietly = TRUE)) {
     stop(
       "The 'aisdk' package is required for AI interpretation functions.\n",
-      "Install it with: devtools::install_github('YuLab-SMU/aisdk')",
+      "Install it with: install.packages('aisdk')",
       call. = FALSE
     )
   }
@@ -258,6 +258,10 @@ tcm_config <- function(provider,
 #'   the system message when \code{response_format} is absent).
 #'   Set \code{FALSE} only when targeting a provider whose API rejects an
 #'   unknown \code{response_format} field entirely.
+#' @param skip_internet_check Logical. Default \code{TRUE}. Sets
+#'   \code{options(aisdk.skip_internet_check = TRUE)} before live requests so
+#'   \code{curl::has_internet()} false negatives in proxy/VPN environments do
+#'   not block otherwise reachable API endpoints.
 #'
 #' @return The model object, invisibly.
 #' @examples
@@ -283,8 +287,13 @@ tcm_setup <- function(provider         = NULL,
                       .env             = TRUE,
                       save             = FALSE,
                       test             = FALSE,
-                      force_json_schema = TRUE) {
+                      force_json_schema = TRUE,
+                      skip_internet_check = TRUE) {
   .check_aisdk()
+
+  if (isTRUE(skip_internet_check)) {
+    options(aisdk.skip_internet_check = TRUE)
+  }
 
   if (.env && requireNamespace("dotenv", quietly = TRUE)) {
     env_file <- file.path(getwd(), ".env")
@@ -343,7 +352,11 @@ tcm_setup <- function(provider         = NULL,
 
   if (test) {
     tryCatch(
-      aisdk::generate_text(model = model_obj, prompt = "ping"),
+      aisdk::generate_text(
+        model = model_obj,
+        prompt = "ping",
+        temperature = NULL
+      ),
       error = function(e) warning(
         "Connection test failed: ", conditionMessage(e), call. = FALSE
       )

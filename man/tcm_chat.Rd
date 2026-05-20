@@ -15,10 +15,10 @@ tcm_chat(model = NULL, verbose = TRUE, stream = TRUE, skills = NULL)
 at runtime with the \code{/stream} command.}
 
 \item{skills}{Character vector of skill directories to load for the chat
-session. Default \code{NULL} uses the active TCMDATA skill directory
-(scanning all skills under it) plus aisdk's \code{skill-creator} skill
-if available. Use \code{character(0)} to disable skills, or pass an
-explicit vector to override the default.}
+session. Default \code{NULL} disables aisdk skills for chat stability and
+uses TCMDATA's built-in tool-oriented system prompt. Pass explicit skill
+paths, for example \code{c(tcm_skill_dir(), tcm_aisdk_skill())}, to enable
+skill loading.}
 }
 \value{
 Invisibly returns a list with \code{history} (each turn's task and

@@ -4,7 +4,7 @@
 # Does NOT require devtools::test() or a compiled package.
 #
 # Usage (from project root):
-#   source("tests/smoke_ai_module.R")
+#   source("inst/scripts/smoke_ai_module.R")
 #
 # Useful when devtools::test() is blocked (e.g. OpenMP shared-memory errors
 # in some environments). Mocks aisdk internals — no live API calls needed.
@@ -20,7 +20,9 @@ for (pkg in c("aisdk", "jsonlite", "igraph")) {
 message("Loading AI module source files...")
 invisible(lapply(
   c("R/ai_core.R", "R/ai_schema.R", "R/ai_analysis.R",
-    "R/ai_draft.R", "R/ai_agent.R",  "R/ai_print.R"),
+    "R/ai_draft.R", "R/ai_artifacts.R", "R/ai_router.R",
+    "R/ai_skills.R", "R/ai_tools.R", "R/ai_task_agent.R",
+    "R/ai_print.R"),
   source
 ))
 

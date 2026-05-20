@@ -71,7 +71,6 @@ Suggests:
     org.Hs.eg.db,
     DOSE
 Remotes:
-    YuLab-SMU/aisdk,
     YuLab-SMU/aplotExtra
 License: Artistic-2.0
 Encoding: UTF-8

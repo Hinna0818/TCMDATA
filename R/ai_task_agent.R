@@ -87,7 +87,11 @@ run_tcm_task <- function(agent, task, model = NULL, verbose = TRUE) {
   }
 
   # Run the agent
-  result <- agent$run(task = resolved$resolved_task, model = model)
+  result <- agent$run(
+    task = resolved$resolved_task,
+    model = model,
+    temperature = NULL
+  )
 
   if (verbose) {
     cat("\n", result$text, "\n")
@@ -203,10 +207,10 @@ tcm_agent <- function(task,
 #' @param stream Logical. Enable streaming output (default TRUE). Toggle
 #'   at runtime with the \code{/stream} command.
 #' @param skills Character vector of skill directories to load for the chat
-#'   session. Default \code{NULL} uses the active TCMDATA skill directory
-#'   (scanning all skills under it) plus aisdk's \code{skill-creator} skill
-#'   if available. Use \code{character(0)} to disable skills, or pass an
-#'   explicit vector to override the default.
+#'   session. Default \code{NULL} disables aisdk skills for chat stability and
+#'   uses TCMDATA's built-in tool-oriented system prompt. Pass explicit skill
+#'   paths, for example \code{c(tcm_skill_dir(), tcm_aisdk_skill())}, to enable
+#'   skill loading.
 #'
 #' @return Invisibly returns a list with \code{history} (each turn's task and
 #'   reply) and \code{artifacts} (a data.frame snapshot from
@@ -263,7 +267,11 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
   n_all_tools <- length(all_tools)
 
   # -- Create persistent chat session --
-  session_agent <- create_tcm_task_agent(tools = all_tools, skills = skills)
+  # Default chat turns should expose only TCMDATA analysis tools. Loading aisdk
+  # skills adds meta-tools such as load_skill, which some proxy-hosted models
+  # call with invalid empty arguments before doing the requested analysis.
+  chat_skills <- if (is.null(skills)) character(0) else skills
+  session_agent <- create_tcm_task_agent(tools = all_tools, skills = chat_skills)
   chat_session <- aisdk::create_chat_session(agent = session_agent, model = model)
 
   cat("\n")
@@ -281,6 +289,11 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
 
   repeat {
     task <- readline(prompt = green_text("> "))
+    if (!interactive() && !nzchar(task)) {
+      cat("\n")
+      header("Session ended. No more input.")
+      break
+    }
     task <- trimws(task)
 
     if (nchar(task) == 0) next
@@ -505,27 +518,37 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
         )
       }
 
-      # Streaming or batch execution
+      # Streaming or batch execution. Some OpenAI-compatible relay APIs reject
+      # stream + tools; retry the same turn without streaming before surfacing
+      # the error to the user.
       if (stream) {
-        stream_buf <- character(0)
         cat(bold_text(paste0("[", agent_name, "]")), "\n")
-        chat_session$send_stream(
-          prompt   = prompt,
-          turn_system_prompt = turn_ctx,
-          callback = function(chunk, done = FALSE) {
+      }
+      turn_result <- .send_tcm_chat_turn(
+        chat_session  = chat_session,
+        session_agent = session_agent,
+        model         = model,
+        prompt        = prompt,
+        turn_ctx      = turn_ctx,
+        stream        = stream,
+        callback      = function(chunk, done = FALSE) {
+          if (!is.null(chunk)) {
             cat(chunk)
-            stream_buf <<- c(stream_buf, chunk)
           }
-        )
-        cat("\n")
-        # Get text from session history
-        response_text <- chat_session$get_last_response()
-        if (is.null(response_text) || !nzchar(response_text)) {
-          response_text <- paste0(stream_buf, collapse = "")
+        },
+        on_stream_error = function(e) {
+          if (stream) {
+            cat("\n")
+            cat(yellow_text(
+              "  [stream failed; retrying this turn without streaming]\n"
+            ))
+          }
         }
-        result <- list(text = response_text, tool_calls = list())
-      } else {
-        result <- chat_session$send(prompt = prompt, turn_system_prompt = turn_ctx)
+      )
+      chat_session <- turn_result$chat_session
+      result <- turn_result$result
+      if (stream && !isTRUE(turn_result$fallback)) {
+        cat("\n")
       }
 
       # Tool call log
@@ -613,16 +636,17 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
             chat_session$send_stream(
               prompt = verify_prompt,
               turn_system_prompt = turn_ctx,
+              temperature = NULL,
               callback = function(chunk, done = FALSE) {
                 cat(chunk)
-                stream_buf <<- c(stream_buf, chunk)
               }
             )
             cat("\n")
           } else {
             verify_result <- chat_session$send(
               prompt = verify_prompt,
-              turn_system_prompt = turn_ctx
+              turn_system_prompt = turn_ctx,
+              temperature = NULL
             )
             cat("\n", verify_result$text, "\n")
           }
@@ -657,6 +681,86 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
     history   = history,
     artifacts = list_tcm_artifacts()
   ))
+}
+
+#' Send one tcm_chat turn, with stream-to-batch fallback
+#' @keywords internal
+#' @noRd
+.send_tcm_chat_turn <- function(chat_session,
+                                session_agent,
+                                model,
+                                prompt,
+                                turn_ctx = NULL,
+                                stream = TRUE,
+                                callback = NULL,
+                                on_stream_error = NULL) {
+  if (!isTRUE(stream)) {
+    result <- chat_session$send(
+      prompt = prompt,
+      turn_system_prompt = turn_ctx,
+      temperature = NULL
+    )
+    return(list(
+      result       = result,
+      chat_session = chat_session,
+      streamed     = FALSE,
+      fallback     = FALSE
+    ))
+  }
+
+  stream_buf <- character(0)
+  stream_error <- NULL
+  tryCatch(
+    chat_session$send_stream(
+      prompt = prompt,
+      turn_system_prompt = turn_ctx,
+      temperature = NULL,
+      callback = function(chunk, done = FALSE) {
+        if (!is.null(chunk)) {
+          stream_buf <<- c(stream_buf, chunk)
+        }
+        if (is.function(callback)) {
+          callback(chunk, done = done)
+        }
+      }
+    ),
+    error = function(e) {
+      stream_error <<- e
+    }
+  )
+
+  if (!is.null(stream_error)) {
+    if (is.function(on_stream_error)) {
+      on_stream_error(stream_error)
+    }
+    fallback_session <- aisdk::create_chat_session(
+      agent = session_agent,
+      model = model
+    )
+    result <- fallback_session$send(
+      prompt = prompt,
+      turn_system_prompt = turn_ctx,
+      temperature = NULL
+    )
+    return(list(
+      result       = result,
+      chat_session = fallback_session,
+      streamed     = FALSE,
+      fallback     = TRUE
+    ))
+  }
+
+  response_text <- chat_session$get_last_response()
+  if (is.null(response_text) || !nzchar(response_text)) {
+    response_text <- paste0(stream_buf, collapse = "")
+  }
+
+  list(
+    result       = list(text = response_text, tool_calls = list()),
+    chat_session = chat_session,
+    streamed     = TRUE,
+    fallback     = FALSE
+  )
 }
 
 #' Default system prompt for TCM task agent
@@ -935,7 +1039,7 @@ make_tcm_function <- function(instruction, name = "CustomFn") {
 run_tcm_agent <- function(agent, query, model = NULL, verbose = TRUE) {
   .check_aisdk()
   model <- .resolve_model(model)
-  result <- agent$run(task = query, model = model)
+  result <- agent$run(task = query, model = model, temperature = NULL)
   if (verbose) {
     cat(result$text, "\n")
     invisible(result$text)

@@ -1,0 +1,7 @@
+interface:
+  display_name: "TCM Network Pharmacology"
+  short_description: "TCMDATA workflows, functions, and plotting"
+  default_prompt: "Use $tcm-network-pharmacology to run a grounded TCMDATA network pharmacology analysis."
+
+policy:
+  allow_implicit_invocation: true
