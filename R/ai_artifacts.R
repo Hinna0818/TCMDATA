@@ -123,6 +123,25 @@ load_tcm_artifact <- function(artifact_id) {
   get(artifact_id, envir = .tcm_artifact_env)
 }
 
+#' Export one stored artifact to an R environment
+#' @keywords internal
+#' @noRd
+.export_tcm_artifact <- function(artifact_id, envir = globalenv()) {
+  assign(artifact_id, load_tcm_artifact(artifact_id), envir = envir)
+  invisible(artifact_id)
+}
+
+#' Export all stored artifacts to an R environment
+#' @keywords internal
+#' @noRd
+.export_tcm_artifacts <- function(envir = globalenv()) {
+  ids <- ls(.tcm_artifact_env)
+  for (id in ids) {
+    .export_tcm_artifact(id, envir = envir)
+  }
+  invisible(ids)
+}
+
 #' List all TCM artifacts in the registry
 #'
 #' Returns a data.frame summarizing all stored artifacts.

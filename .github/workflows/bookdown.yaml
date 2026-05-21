@@ -11,6 +11,7 @@ on:
       - aisdk
       - ppi_metrics_fix
       - skills
+      - master
 
 permissions:
   contents: write

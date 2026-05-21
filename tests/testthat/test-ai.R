@@ -239,6 +239,137 @@ test_that("custom is absent from provider whitelist", {
   expect_true("gemini"    %in% providers)
 })
 
+test_that("tcm_setup enables aisdk internet-check bypass by default", {
+  skip_if_not_installed("aisdk")
+
+  fake_provider <- list(
+    language_model = function(model_id) {
+      structure(
+        list(model_id = model_id, provider = "openai"),
+        class = "LanguageModelV1"
+      )
+    }
+  )
+
+  local_mocked_bindings(
+    create_openai = function(...) fake_provider,
+    set_model = function(model) invisible(NULL),
+    .package = "aisdk"
+  )
+
+  old <- getOption("aisdk.skip_internet_check", NULL)
+  on.exit(options(aisdk.skip_internet_check = old), add = TRUE)
+  options(aisdk.skip_internet_check = FALSE)
+
+  tcm_setup(
+    provider = "openai",
+    api_key = "test-key",
+    model = "test-model",
+    test = FALSE
+  )
+
+  expect_true(isTRUE(getOption("aisdk.skip_internet_check")))
+})
+
+test_that("tcm_setup test request omits temperature for proxy compatibility", {
+  skip_if_not_installed("aisdk")
+
+  fake_provider <- list(
+    language_model = function(model_id) {
+      structure(
+        list(model_id = model_id, provider = "openai"),
+        class = "LanguageModelV1"
+      )
+    }
+  )
+  captured <- list()
+
+  local_mocked_bindings(
+    create_openai = function(...) fake_provider,
+    set_model = function(model) invisible(NULL),
+    generate_text = function(...) {
+      captured$args <<- list(...)
+      list(text = "pong")
+    },
+    .package = "aisdk"
+  )
+
+  tcm_setup(
+    provider = "openai",
+    api_key = "test-key",
+    model = "test-model",
+    test = TRUE
+  )
+
+  expect_true("temperature" %in% names(captured$args))
+  expect_null(captured$args$temperature)
+})
+
+test_that(".send_tcm_chat_turn falls back when streaming fails", {
+  skip_if_not_installed("aisdk")
+
+  failing_stream_session <- list(
+    send_stream = function(prompt, callback, ...) {
+      stop("stream failed")
+    },
+    get_last_response = function() ""
+  )
+  fallback_session <- list(
+    send = function(prompt, ...) {
+      captured$send_args <<- list(...)
+      list(text = paste("batch", prompt), tool_calls = list())
+    }
+  )
+  captured <- list()
+
+  local_mocked_bindings(
+    create_chat_session = function(agent, model) fallback_session,
+    .package = "aisdk"
+  )
+
+  saw_stream_error <- FALSE
+  out <- .send_tcm_chat_turn(
+    chat_session = failing_stream_session,
+    session_agent = list(),
+    model = "mock-model",
+    prompt = "hello",
+    stream = TRUE,
+    on_stream_error = function(e) {
+      saw_stream_error <<- TRUE
+    }
+  )
+
+  expect_true(saw_stream_error)
+  expect_true(isTRUE(out$fallback))
+  expect_equal(out$result$text, "batch hello")
+  expect_identical(out$chat_session, fallback_session)
+  expect_true("temperature" %in% names(captured$send_args))
+  expect_null(captured$send_args$temperature)
+})
+
+test_that(".send_tcm_chat_turn omits temperature for batch chat", {
+  captured <- list()
+  batch_session <- list(
+    send = function(prompt, ...) {
+      captured$send_args <<- list(...)
+      list(text = "batch ok", tool_calls = list())
+    }
+  )
+
+  out <- .send_tcm_chat_turn(
+    chat_session = batch_session,
+    session_agent = list(),
+    model = "mock-model",
+    prompt = "hello",
+    stream = FALSE
+  )
+
+  expect_false(isTRUE(out$fallback))
+  expect_equal(out$result$text, "batch ok")
+  expect_true("temperature" %in% names(captured$send_args))
+  expect_null(captured$send_args$temperature)
+})
+
 # ── Regression: artifacts, tools, routing ───────────────────────────────────
 
 test_that("artifact registry keeps artifact metadata", {
@@ -257,6 +388,36 @@ test_that("artifact registry keeps artifact metadata", {
   expect_equal(nrow(row), 1)
   expect_equal(row$artifact_type, "table_result")
   expect_equal(row$r_class, "data.frame")
+})
+
+test_that("tool artifacts are immediately available to eval_r_code", {
+  skip_if_not_installed("aisdk")
+
+  clear_tcm_artifacts()
+  on.exit(clear_tcm_artifacts(), add = TRUE)
+
+  result <- .save_tool_artifact(
+    object = data.frame(target = c("TP53", "AKT1"), stringsAsFactors = FALSE),
+    artifact_type = "search_result",
+    function_name = "unit_test"
+  )
+  on.exit(
+    if (exists(result$artifact_id, envir = globalenv(), inherits = FALSE)) {
+      rm(list = result$artifact_id, envir = globalenv())
+    },
+    add = TRUE
+  )
+
+  expect_true(exists(result$artifact_id, envir = globalenv(), inherits = FALSE))
+
+  code <- sprintf(
+    "df <- get('%s', envir = .GlobalEnv); cat(paste(unique(df$target), collapse = ','))",
+    result$artifact_id
+  )
+  eval_result <- tool_eval_r_code()$run(list(code = code))
+
+  expect_true(isTRUE(eval_result$ok))
+  expect_true(grepl("TP53,AKT1", eval_result$output, fixed = TRUE))
 })
 
 test_that("create_tcm_tools exposes expanded tool modules", {

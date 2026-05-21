@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 The AI module requires both `TCMDATA` and `aisdk`:
 
 ```{r install, eval=FALSE}
-devtools::install_github("YuLab-SMU/aisdk")
+install.packages("aisdk")
 library(aisdk)
 library(TCMDATA)
 ```

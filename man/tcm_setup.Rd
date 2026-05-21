@@ -12,7 +12,8 @@ tcm_setup(
   .env = TRUE,
   save = FALSE,
   test = FALSE,
-  force_json_schema = TRUE
+  force_json_schema = TRUE,
+  skip_internet_check = TRUE
 )
 }
 \arguments{
@@ -44,6 +45,11 @@ contains the schema instruction (some 3rd-party relay APIs silently strip
 the system message when \code{response_format} is absent).
 Set \code{FALSE} only when targeting a provider whose API rejects an
 unknown \code{response_format} field entirely.}
+
+\item{skip_internet_check}{Logical. Default \code{TRUE}. Sets
+\code{options(aisdk.skip_internet_check = TRUE)} before live requests so
+\code{curl::has_internet()} false negatives in proxy/VPN environments do
+not block otherwise reachable API endpoints.}
 }
 \value{
 The model object, invisibly.

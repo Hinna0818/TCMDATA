@@ -1,100 +1,91 @@
 ---
 name: tcm-network-pharmacology
 description: >
-  Domain knowledge and tool usage reference for TCM network pharmacology.
-  Consult this skill for parameter defaults, tool combinations, and quality
-  thresholds. This is a REFERENCE — not an execution plan.
-  Execute ONLY what the user asks for.
+  TCMDATA network pharmacology analysis skill for Traditional Chinese Medicine workflows in R.
+  Use when the user asks to query herbs, compounds, targets, disease genes, PubMed evidence,
+  molecule annotation, compound similarity, herb/disease target intersection, GO/KEGG/Herb
+  enrichment, GSEA, PPI network construction, topology calculation and ranking, community detection, PPI robustness
+  analysis, machine-learning key target screening, diagnostic ROC/boxplots, AI interpretation,
+  report drafting, or publication-style visualization for TCM network pharmacology. Also use
+  for Chinese requests such as 中药网络药理学分析, 靶点查询, 疾病靶点, 富集分析, PPI分析, 机器学习筛选,
+  分子注释, 文献挖掘, and AI模块.
 ---
 
-# TCM Network Pharmacology — Tool Reference
+# TCMDATA Network Pharmacology
 
-This document is a **look-up reference**, not an execution plan.
-Read the section relevant to the user's current request; ignore the rest.
+Use this skill as an execution guide for TCMDATA-based network pharmacology tasks. Execute exactly the analysis scope requested by the user. Do not expand a target query into a full pipeline unless the user explicitly asks for a complete, systematic, or network pharmacology analysis.
 
-## Core Principle
+## First Move
 
-**Do exactly what the user asks — nothing more, nothing less.**
+1. Identify the requested scope: lookup, molecule annotation, intersection, enrichment, PPI, machine learning, visualization, AI interpretation, or full pipeline.
+2. Load only the reference file needed for that scope.
+3. Prefer TCMDATA functions and built-in agent tools over ad hoc code.
+4. Preserve object names requested by the user, especially plot names such as `p_kegg`.
+5. Report exact counts, thresholds, and artifact IDs from tool outputs. Never invent genes, terms, p-values, pathways, or evidence.
 
-- "查黄芪靶点" → call `search_herb_records`, return results. Done.
-- "做个GO富集" → call `run_go_enrichment`. Done.
-- "找出黄芪靶点，然后做GO富集" → do BOTH: search + enrichment in one turn.
-- "做黄芪治疗脓毒症的网络药理学分析" → chain multiple tools as a full pipeline.
+## Reference Files
 
-Keyword signals for multi-step: 然后, 接着, 并且, and then, comma-separated actions.
-After completing ALL requested steps, you may mention 1–2 possible next steps but do NOT auto-execute them.
+| File | Open when |
+|------|-----------|
+| `references/workflow.md` | Need a full or partial analysis workflow covering all package documentation sections |
+| `references/function-reference.md` | Need exact function usage, parameter interpretation, or examples for any exported TCMDATA function |
+| `references/package-sections.md` | Need to ensure every documentation section is represented in a plan or answer |
+| `references/plotting-style.md` | Need publication-style R plots for enrichment, PPI, ML, network, docking, or report figures |
+| `references/quality-checkpoints.md` | Need thresholds, warnings, or sanity checks for target counts, intersections, PPI, enrichment, hubs, or literature |
+| `references/data-sources.md` | Need source grounding, evidence hierarchy, anti-hallucination rules, or cross-validation guidance |
 
-## Tool Quick Reference
+## Scope Rules
 
-| Task | Tool(s) | Key defaults |
-|------|---------|-------------|
-| Herb targets | `search_herb_records` | auto-detect type by input language |
-| Disease targets | `search_disease_targets` | — |
-| Target intersection | `compute_target_intersection` | supports 2/3/4-way |
-| PPI network | `get_ppi_network` → `compute_ppi_metrics` → `rank_ppi_nodes` | score_threshold=400, top_n=10 |
-| GO enrichment | `run_go_enrichment` | ontology="BP", p<0.05 |
-| KEGG enrichment | `run_kegg_enrichment` | p<0.05 |
-| Herb enrichment | `run_herb_enrichment` | — |
-| ML screening | `prepare_ml_dataset` → `run_ml_screening` → `get_ml_consensus` | min_methods=2 |
-| PubMed evidence | `get_pubmed_evidence` | max_results=20 |
-| Compound info | `resolve_compound_cid` → `get_compound_properties` | — |
-| GEO search | `search_geo_datasets` | organism="Homo sapiens" |
-| Visualization | `plot_enrichment_result`, `plot_ppi_result`, `plot_herb_sankey`, `plot_ml_result`, `plot_pubmed_result`, `plot_docking_heatmap` | — |
-| Interpretation | `interpret_artifact` | pass artifact_id |
+- For simple lookup requests, run only the relevant query function and summarize the result.
+- For enrichment requests, use the gene set explicitly requested. If the user says herb targets, use herb targets; if the user says herb-disease intersection, compute the intersection first.
+- For full network pharmacology requests, run target collection, intersection, PPI, enrichment, visualization, evidence validation, and report synthesis in that order.
+- For expression, DEG, WGCNA, ML, or single-cell validation, run those sections only when the user provides suitable data or explicitly asks to incorporate them.
+- For AI chat/tool workflows, use artifact IDs returned by tools; if executing R code in the same turn, load artifacts through `load_tcm_artifact()` or use exported artifact variables when available.
 
-## Parameter Defaults
+## Core Pipeline
 
-- **Herb name type**: Chinese characters → `"Herb_cn_name"`, capitalized → `"Herb_pinyin_name"`, lowercase → `"Herb_en_name"`
-- **PPI score**: 400 (medium). Use 700 for stringent.
-- **Enrichment cutoffs**: pvalueCutoff=0.05, qvalueCutoff=0.2
-- **Hub gene ranking**: composite hub_score from `rank_ppi_nodes`, top 10
+Use this order for a complete herb-disease network pharmacology analysis:
 
-## Quality Thresholds
+1. Herb targets: `search_herb()`
+2. Disease targets: `search_disease()`
+3. Intersection: `getvenndata()` / `getvennresult()` or the agent intersection tool
+4. PPI: `get_ppi()` -> `compute_nodeinfo()` -> `rank_ppi_nodes()`
+5. Community and robustness when requested: `run_louvain()`, `run_mcode()`, `run_MCL()`, `run_fastgreedy()`, `ppi_knock()`
+6. Enrichment: `herb_enricher()` and standard GO/KEGG workflows from `workflow.md`
+7. Machine learning when expression data is present: `prepare_ml_data()` -> `run_ml_screening()` -> `get_ml_consensus()`
+8. Visualization: select plots from `plotting-style.md` and `function-reference.md`
+9. Evidence and interpretation: `get_pubmed_data()`, `get_pubmed_table()`, `tcm_interpret()`, `draft_result_paragraph()`
 
-- Intersection < 5 genes → warn user, suggest relaxing parameters
-- Intersection > 500 genes → suggest narrowing disease scope
-- PPI < 10 edges → try lowering score_threshold to 150
-- Enrichment 0 significant terms → suggest relaxing cutoffs
-- PubMed 0 results → report honestly, do NOT fabricate evidence
+Key rule: use intersection genes, not all herb or disease genes, for downstream PPI/enrichment when the user asks for herb-disease mechanism analysis.
 
-## Data Integrity Rules
+## Reporting Rules
 
-- NEVER fabricate gene names, pathway names, or p-values
-- ALWAYS cite exact numbers from tool outputs
-- Distinguish evidence levels: clinical (HERB 2.0) > experimental > computational (TCMDATA) > single-database
-- Use `generate_verification_urls` for cross-validation links when reporting key findings
+- State source and exact counts: herb records, unique targets, disease genes, intersection size, PPI nodes/edges, significant terms, selected hub genes.
+- Use adjusted p-values for enrichment claims.
+- Distinguish computational predictions from experimental, literature, or clinical evidence.
+- Mention empty results honestly and suggest parameter relaxation only after reporting the failure.
+- Keep Chinese answers in Chinese unless the user requests English.
 
-## Multi-Step Pipeline (only when explicitly requested)
+## Minimal Report Template
 
-When the user asks for a "complete analysis", "network pharmacology", or "full pipeline":
-
-1. **Targets**: herb targets + disease targets → intersection
-2. **Network**: PPI → metrics → hub genes
-3. **Enrichment**: GO-BP + KEGG on intersection genes
-4. **Visualization**: sankey + PPI heatmap + enrichment lollipop
-5. **Validation** (optional): PubMed evidence + cross-DB links
-6. **Expression** (if data provided): WGCNA / ML / DEG integration
-7. **Report**: structured summary with numbers from each step
-
-Key rule for pipelines: always compute intersection BEFORE PPI/enrichment.
-Use intersection genes (not herb or disease genes alone) for downstream analysis.
-
-## Report Template (for full pipeline only)
-
-```
-## [Herb] treats [Disease] — Network Pharmacology
+```markdown
+## [Herb] - [Disease] Network Pharmacology
 
 ### Target Retrieval
-- Herb targets: [N] (TCMDATA) | Disease targets: [N] (DisGeNET)
-- Intersection: [N] common targets
+- Herb targets: [N]
+- Disease genes: [N]
+- Common targets: [N]
 
-### PPI & Hub Genes
-- Network: [N] nodes, [M] edges (STRING ≥ [threshold])
-- Top hub genes: [list]
+### PPI and Hub Genes
+- STRING threshold: [score]
+- Network: [nodes] nodes, [edges] edges
+- Top hub genes: [genes]
 
-### Enrichment
-- GO-BP: [top 3] | KEGG: [top 3]
+### Functional Enrichment
+- GO-BP top terms: [terms with adjusted p-values]
+- KEGG top pathways: [pathways with adjusted p-values]
 
-### Key Findings
-[Grounded interpretation]
+### Evidence and Interpretation
+- PubMed evidence: [N] records
+- Mechanistic summary: [grounded interpretation]
 ```
