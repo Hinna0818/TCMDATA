@@ -22,7 +22,7 @@ For details, please visit the [full documentation](https://hinna0818.github.io/T
 
 - 🌿 **Built-in TCM Database**: Manually curated herb–compound–target interaction data ready for analysis
 - 🔬 **PubChem Integration**: Compound identification, property retrieval, and structure download
-- 📊 **PPI Network Analysis**: 17+ centrality metrics with community detection and robustness evaluation
+- 📊 **PPI Network Analysis**: STRING-based network retrieval, 17+ centrality metrics, community detection, robustness evaluation, and weighted disease-module proximity analysis for target or formula prioritization
 - 🤖 **Machine Learning-based Feature Selection**: 6 algorithms (LASSO, Elastic Net, Ridge, RF+Boruta, SVM-RFE, XGBoost) with consensus scoring
 - 🧠 **AI Agent System**: LLM-powered agent with natural language task routing, skill-based workflow, and interactive chat (`tcm_agent()`, `tcm_chat()`)
 - 📚 **Literature & Data Mining**: PubMed search and GEO dataset discovery for TCM–disease studies
@@ -37,7 +37,7 @@ For details, please visit the [full documentation](https://hinna0818.github.io/T
 | **Molecule Detection** | PubChem-based CID resolution, property annotation, similarity search | `resolve_cid()`, `getprops()`, `compound_similarity()` |
 | **Network Construction** | Build herb–compound–target networks with topological metrics | `prepare_herb_graph()` |
 | **Enrichment Analysis** | Herb-based over-representation analysis; GO/KEGG compatible | `herb_enricher()` |
-| **PPI Analysis** | STRING retrieval, 17+ centrality metrics, community detection, robustness | `get_ppi()`, `compute_nodeinfo()`, `ppi_knock()` |
+| **PPI Analysis** | STRING retrieval, 17+ centrality metrics, community detection, robustness, and weighted target-set proximity to disease modules | `get_ppi()`, `compute_nodeinfo()`, `rank_tcm_targets_by_ppi()`, `evaluate_tcm_target_sets_by_ppi()`, `ppi_knock()` |
 | **Clustering** | Louvain, MCL, and MCODE community detection | `run_louvain()`, `run_MCL()`, `run_mcode()` |
 | **ML Screening** | 6 algorithms × 3 validation modes with consensus analysis | `run_ml_screening()`, `plot_ml_roc()` |
 | **AI Agent** | Natural language task routing, skill-based workflow, interactive chat | `tcm_agent()`, `tcm_chat()`, `tcm_interpret()` |

@@ -65,18 +65,26 @@ ggvenn_plot <- function(venn_df,
     set.name.color
   }
   
-  p <- ggvenn::ggvenn(
-    data = venn_df,
-    columns = col_names,
-    show_percentage = show.percentage,
-    show_elements = show.elements,
-    digits = digits,
-    fill_color = set.color[seq_along(col_names)],
-    stroke_color = stroke.color,
-    stroke_size = stroke.size,
-    set_name_color = set_name_color_final,
-    set_name_size = name.size,
-    text_size = text.size
+  p <- withCallingHandlers(
+    ggvenn::ggvenn(
+      data = venn_df,
+      columns = col_names,
+      show_percentage = show.percentage,
+      show_elements = show.elements,
+      digits = digits,
+      fill_color = set.color[seq_along(col_names)],
+      stroke_color = stroke.color,
+      stroke_size = stroke.size,
+      set_name_color = set_name_color_final,
+      set_name_size = name.size,
+      text_size = text.size
+    ),
+    warning = function(w) {
+      msg <- conditionMessage(w)
+      if (grepl("Using `size` aesthetic for lines was deprecated", msg, fixed = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
   ) +
     ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = expand_ratio))
   

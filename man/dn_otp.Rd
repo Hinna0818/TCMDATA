@@ -5,7 +5,7 @@
 \alias{dn_otp}
 \title{Diabetic Nephropathy (DN) Associated Genes from Open Targets Platform}
 \format{
-A character vector with 4148 elements:
+A character vector with 3944 elements:
 \describe{
 \item{dn_otp}{HGNC gene symbols representing targets associated with DN,
 ordered by their overall association score (descending).}
