@@ -6,7 +6,14 @@ In network pharmacology analysis, disease target retrieval and differential gene
 
 ## Programmatic disease target retrieval with TCMDATA {#disease-target-tcmdata}
 
-Before manually browsing individual databases, it is worth noting that `TCMDATA` provides two convenient functions for **programmatic** disease–gene association retrieval, powered by the [DisGeNET](https://www.disgenet.org/) dataset bundled in the [`DOSE`](https://bioconductor.org/packages/DOSE/) Bioconductor package. This approach allows you to query disease targets directly from R without visiting any web interface.
+Before manually browsing individual databases, it is worth noting that `TCMDATA` provides convenient functions for **programmatic** disease–gene association retrieval. Currently, two complementary routes are supported:
+
+1. `search_disease()` and `search_gene_disease()` retrieve disease-gene associations from the [DisGeNET](https://www.disgenet.org/) dataset bundled in the [`DOSE`](https://bioconductor.org/packages/DOSE/) Bioconductor package.
+2. `search_disease_efo()`, `get_disease_targets()`, and `query_disease_targets()` retrieve scored disease-target associations from the [Open Targets Platform](https://platform.opentargets.org/) GraphQL API.
+
+The DOSE/DisGeNET route is useful for fast local lookup, while Open Targets is preferred when target-level association scores are needed for target weighting or PPI-based prioritization.
+
+For the DN case study used in this book, `TCMDATA` also includes `dn_otp_tbl`, a built-in Open Targets-derived table that retains the target-level `score` column, in addition to the legacy symbol vector `dn_otp`.
 
 ### `search_disease()`: disease → genes
 
@@ -75,6 +82,56 @@ head(shared)
 Diseases shared by IL6, TNF, PPARG: 516
 [1] "Abnormal behavior"    "Acanthosis Nigricans" "Acne"
 [4] "Acne Vulgaris"        "Acute Chest Syndrome" "Acute colitis"
+```
+
+### Open Targets API: disease → scored targets
+
+Open Targets provides an overall association score for each disease-target pair. This score is especially useful when disease targets should be treated as weighted evidence rather than a simple unweighted gene set.
+
+The recommended workflow is:
+
+1. Search the disease ontology identifier.
+2. Retrieve associated targets by EFO/MONDO/Orphanet ID.
+3. Keep the `score` column for downstream weighting.
+
+```{r opentargets-api-demo, eval=FALSE, collapse=FALSE}
+library(TCMDATA)
+
+## Step 1: inspect disease ontology matches
+search_disease_efo("diabetic nephropathy", size = 5)
+
+## Step 2: retrieve associated targets from the selected disease ID
+dn_ot <- get_disease_targets("EFO_0000401", size = 500, score_threshold = 0.05)
+head(dn_ot)
+```
+
+```
+  ensembl_id      gene_symbol gene_name       biotype        score
+1 ENSG00000159640 ACE         angiotensin... protein_coding 0.7654
+2 ENSG00000144891 AGTR1       angiotensin... protein_coding 0.5903
+3 ENSG00000148737 TCF7L2      transcription... protein_coding 0.5131
+4 ENSG00000254647 INS         insulin         protein_coding 0.4939
+```
+
+Alternatively, `query_disease_targets()` combines disease-name search and target retrieval in one call:
+
+```{r opentargets-query-demo, eval=FALSE, collapse=FALSE}
+dn_ot <- query_disease_targets(
+  disease_name = "diabetic nephropathy",
+  size = 500,
+  score_threshold = 0.05
+)
+
+dn_ot_targets <- dn_ot$gene_symbol
+```
+
+If the disease name is ambiguous, first run `search_disease_efo()` and then pass the exact disease ID to `get_disease_targets()`. This is usually safer for reproducible analysis.
+
+For reproducible examples without online API calls, the built-in `dn_otp_tbl` object can be used directly:
+
+```{r dn-otp-tbl-demo, eval=FALSE, collapse=FALSE}
+data(dn_otp_tbl)
+head(dn_otp_tbl[, c("symbol", "score", "source")])
 ```
 
 ---
@@ -412,6 +469,117 @@ head(core_genes, 20)
 ```
 
 The core intersection genes, those shared across multiple databases and DEGs, can then be carried forward to PPI network construction (Chapter \@ref(ppi-analysis)) and enrichment analysis (Chapter \@ref(enrichment)).
+
+---
+
+## PPI-weighted target ranking {#ppi-weighted-target-ranking}
+
+The classical network pharmacology workflow often retains only the direct intersection between herb targets and disease targets. This is simple, but it ignores two important issues:
+
+1. Disease targets from different databases may have different levels of evidence.
+2. A non-overlapping herb target may still be biologically relevant if it is close to the disease module in the human PPI network.
+
+`TCMDATA` therefore provides `rank_tcm_targets_by_ppi()`, which ranks herb targets by their proximity to a weighted disease module on a global PPI background. The function uses the built-in human STRING PPI network by default, calculates weighted shortest-path proximity to disease targets, and estimates a degree-matched random background for each candidate target. The final score is the no-self proximity Z-score:
+
+```text
+Score_final = z_proximity_no_self
+```
+
+For direct-overlap targets, the no-self score evaluates whether the target is close to other disease-module genes, rather than giving it an automatic advantage simply because its distance to itself is zero.
+
+### Example: Lingzhi targets against DN disease module
+
+For the DN case study, `TCMDATA` includes scored GeneCards and Open Targets tables:
+
+```text
+dn_gcds_tbl: GeneCards targets with Relevance Score
+dn_otp_tbl: Open Targets targets with overall association score
+```
+
+These scored sources can be combined into a weighted disease module using `prepare_disease_weights()`:
+
+```{r ppi-weighted-ranking-demo, eval=FALSE, collapse=FALSE}
+library(TCMDATA)
+
+## scored DN disease targets
+data(dn_gcds_tbl)
+data(dn_otp_tbl)
+
+disease_w <- prepare_disease_weights(
+  GeneCards = dn_gcds_tbl,
+  OpenTargets = dn_otp_tbl
+)
+
+## Lingzhi herb targets from TCMDATA
+lingzhi_df <- search_herb("lingzhi", type = "Herb_pinyin_name")
+herb_w <- prepare_herb_target_weights(lingzhi_df, method = "binary")
+
+## PPI-weighted target ranking
+rank_res <- rank_tcm_targets_by_ppi(
+  herb_targets = herb_w,
+  disease_targets = disease_w,
+  n_perm = 1000,
+  seed = 20260525
+)
+
+head(rank_res$result[, c(
+  "target", "Rank_final", "Score_final", "direct_overlap",
+  "disease_weight_if_overlap", "proximity_no_self",
+  "z_proximity_no_self", "p_empirical_no_self"
+)], 10)
+```
+
+A typical output table has one row per herb target:
+
+```text
+   target Rank_final Score_final direct_overlap disease_weight_if_overlap
+1    TP53          1        3.24           TRUE                    0.227
+2   PTPN1          2        3.10           TRUE                    0.276
+3    EGFR          3        2.95           TRUE                    0.176
+4     INS          4        2.89           TRUE                    1.000
+5     ALB          5        2.87           TRUE                    0.508
+
+  proximity_no_self z_proximity_no_self p_empirical_no_self
+1             0.312                3.24               0.001
+2             0.262                3.10               0.002
+3             0.309                2.95               0.004
+4             0.309                2.89               0.003
+5             0.295                2.87               0.004
+```
+
+The main columns are interpreted as follows:
+
+| Column | Meaning |
+|--------|---------|
+| `target` | Herb target gene symbol |
+| `direct_overlap` | Whether the herb target is also a disease target |
+| `disease_weight_if_overlap` | Disease evidence weight if the target is in the disease module |
+| `proximity_no_self` | Weighted PPI proximity to the disease module after excluding self-contribution for overlap targets |
+| `Score_final` | Final ranking score, currently equal to `z_proximity_no_self` |
+| `p_empirical_no_self` | Empirical P-value from degree-matched random background |
+
+A practical interpretation is:
+
+```text
+Score_final > 0  closer to the disease module than same-degree random nodes
+Score_final > 1  useful exploratory cutoff
+Score_final > 2  stronger PPI-proximity evidence
+```
+
+This ranking can be used to select prioritized targets for enrichment, PPI subnetwork construction, or downstream validation:
+
+```{r select-ppi-ranked-targets, eval=FALSE, collapse=FALSE}
+top_targets <- select_tcm_targets(
+  rank_res,
+  top_n = 50,
+  min_score = 1,
+  return = "targets"
+)
+
+head(top_targets)
+```
+
+The method should be viewed as a target-prioritization strategy rather than a replacement for biological validation. It keeps direct overlaps visible, but it also allows high-ranking non-overlap targets to be discovered when they are network-proximal to the weighted disease module.
 
 ---
 

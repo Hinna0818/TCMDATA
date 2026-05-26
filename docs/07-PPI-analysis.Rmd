@@ -54,6 +54,119 @@ cat("After  filtering:", vcount(ppi_filtered), "nodes,", ecount(ppi_filtered), "
 
 ---
 
+## Target-set proximity to a disease PPI module {#ppi-target-set-proximity}
+
+In addition to constructing a PPI network for a selected gene list, an important network pharmacology question is whether a **target set** is globally close to a disease module in the human PPI background. This is especially useful for comparing:
+
+1. Different herbs or formulas against the same disease.
+2. Formula designs before and after optimization.
+3. Candidate herb combinations, compound combinations, or target sets.
+
+`TCMDATA` provides `evaluate_tcm_target_sets_by_ppi()` for this set-level analysis. Unlike `rank_tcm_targets_by_ppi()`, which ranks individual herb targets, this function evaluates the relationship between a target set `H` and a weighted disease module `D`.
+
+The function reports five complementary network metrics:
+
+| Metric | Meaning |
+|--------|---------|
+| `overlap_n` | Number of direct shared targets between `H` and `D` |
+| `directlink_edges` | Number of one-step PPI links from non-overlap targets in `H` to disease targets in `D` |
+| `jaccard` | Direct set similarity, `|H ∩ D| / |H ∪ D|` |
+| `weighted_proximity` | Disease-weighted PPI proximity between `H` and `D` |
+| `z_proximity` | Degree-matched random-background Z-score for the observed proximity |
+
+The weighted proximity is calculated from shortest-path distances on the PPI network:
+
+```text
+proximity(h, D) =
+  weighted.mean(1 / (1 + shortest_path_distance(h, d)),
+                disease_weight[d])
+
+weighted_proximity(H, D) =
+  weighted.mean(proximity(h, D), target_weight[h])
+```
+
+To control for the fact that high-degree proteins are naturally closer to many network modules, the function samples random target sets with matched degree bins and calculates:
+
+```text
+z_proximity = (observed_proximity - mean(random_proximity)) /
+              sd(random_proximity)
+```
+
+A positive `z_proximity` means that the target set is closer to the disease module than expected from same-degree random target sets.
+
+### Example: evaluating Lingzhi target set against DN
+
+For the DN case study, we can combine GeneCards and Open Targets scores into a weighted disease module, then evaluate whether the Lingzhi target set is close to this DN module in the built-in human STRING PPI background:
+
+```{r ppi-target-set-proximity-demo, eval=FALSE, collapse=FALSE}
+library(TCMDATA)
+
+## weighted DN disease module
+data(dn_gcds_tbl)
+data(dn_otp_tbl)
+
+disease_w <- prepare_disease_weights(
+  GeneCards = dn_gcds_tbl,
+  OpenTargets = dn_otp_tbl
+)
+
+## Lingzhi target set
+lingzhi_df <- search_herb("lingzhi", type = "Herb_pinyin_name")
+lingzhi_w <- prepare_herb_target_weights(lingzhi_df, method = "binary")
+
+## set-level PPI proximity evaluation
+set_eval <- evaluate_tcm_target_sets_by_ppi(
+  target_sets = list(Lingzhi = lingzhi_w),
+  disease_targets = disease_w,
+  n_perm = 1000,
+  seed = 20260525
+)
+
+set_eval$result[, c(
+  "set", "n_targets_in_ppi", "overlap_n",
+  "overlap_target_fraction", "directlink_edges",
+  "first_order_target_coverage", "jaccard",
+  "weighted_proximity", "z_proximity", "p_empirical"
+)]
+```
+
+A simplified output may look like this:
+
+```text
+     set n_targets_in_ppi overlap_n overlap_target_fraction directlink_edges
+ Lingzhi              894       610                  0.6823            3983
+
+ first_order_target_coverage jaccard weighted_proximity z_proximity p_empirical
+                      0.9810  0.1058             0.2325       17.88      0.001
+```
+
+This result would be interpreted as follows:
+
+- `overlap_n = 610`: many Lingzhi targets directly overlap with DN targets.
+- `first_order_target_coverage = 0.981`: most Lingzhi targets either directly overlap with the DN module or are one PPI step away from it.
+- `jaccard = 0.1058`: direct set similarity is modest because the DN disease module is large.
+- `z_proximity = 17.88`: Lingzhi targets are much closer to the weighted DN module than degree-matched random target sets.
+
+For comparing multiple candidate formulas or combinations, pass a named list:
+
+```{r ppi-multi-target-set-demo, eval=FALSE, collapse=FALSE}
+multi_eval <- evaluate_tcm_target_sets_by_ppi(
+  target_sets = list(
+    formula_A = formula_A_targets,
+    formula_B = formula_B_targets,
+    optimized_formula = optimized_targets
+  ),
+  disease_targets = disease_w,
+  n_perm = 1000
+)
+
+multi_eval$result[order(multi_eval$result$Rank_set), ]
+```
+
+In multi-set analysis, `Rank_set` ranks target sets by `Score_set`, which is currently equal to `z_proximity`. In single-set analysis, `Rank_set` is always 1 and should not be overinterpreted; the key statistics are `z_proximity`, `p_empirical`, `overlap_n`, and `first_order_target_coverage`.
+
+---
+
 ## Topological metrics {#topology}
 
 Topological analysis of PPI networks is fundamental for identifying disease-critical nodes. By quantifying centrality metrics such as degree, betweenness, and closeness, researchers can pinpoint hub proteins that serve as key regulators, bottleneck nodes that control information flow, and bridge proteins that connect functional modules. These topologically important nodes often represent promising therapeutic targets.

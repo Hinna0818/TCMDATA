@@ -129,6 +129,26 @@
 "dn_gcds"
 
 
+#' Scored Diabetic Nephropathy (DN) Targets from GeneCards
+#'
+#' A scored target table for Diabetic Nephropathy (DN), retrieved from
+#' GeneCards. The \code{score} column stores the GeneCards Relevance Score.
+#'
+#' @format A data frame with columns:
+#' \describe{
+#'   \item{symbol}{HGNC gene symbol.}
+#'   \item{score}{GeneCards Relevance Score.}
+#'   \item{source}{Data source label, \code{"GeneCards"}.}
+#'   \item{description}{Gene description from GeneCards.}
+#'   \item{category}{GeneCards category.}
+#'   \item{uniprot_id}{UniProt identifier, when available.}
+#'   \item{genecards_id}{GeneCards identifier.}
+#' }
+#' @source \url{https://www.genecards.org/}
+#' @usage data(dn_gcds_tbl)
+"dn_gcds_tbl"
+
+
 #' DESeq2 Differential Expression Results for Early Diabetic Nephropathy
 #'
 #' A data frame containing DESeq2 differential expression analysis results
@@ -206,6 +226,53 @@
 #' head(dn_otp)
 #' length(dn_otp)
 "dn_otp"
+
+
+#' Scored Diabetic Nephropathy (DN) Targets from Open Targets Platform
+#'
+#' A scored target table for Diabetic Nephropathy (DN), retrieved from the
+#' Open Targets Platform (EFO:0000401). The \code{score} column stores the
+#' global target-disease association score.
+#'
+#' @format A data frame with columns:
+#' \describe{
+#'   \item{symbol}{HGNC gene symbol.}
+#'   \item{score}{Open Targets global association score.}
+#'   \item{source}{Data source label, \code{"OpenTargets"}.}
+#'   \item{...}{Additional Open Targets evidence-channel columns retained from
+#'     the downloaded target association table.}
+#' }
+#' @source \url{https://platform.opentargets.org/}
+#' @usage data(dn_otp_tbl)
+"dn_otp_tbl"
+
+
+#' STRING Human High-Confidence PPI Background Network
+#'
+#' A processed human STRING v12.0 high-confidence PPI background network for
+#' target ranking by disease-module proximity. The object is the largest
+#' connected component after filtering STRING links to
+#' \code{combined_score >= 700}.
+#'
+#' @format An undirected \code{igraph} object with:
+#' \describe{
+#'   \item{15,882 vertices}{Gene-symbol vertices mapped from STRING proteins.}
+#'   \item{236,712 edges}{High-confidence STRING functional associations.}
+#'   \item{Edge attributes}{\code{combined_score} on the 0-1000 STRING scale,
+#'     \code{score = combined_score / 1000}, and
+#'     \code{distance = 1 / score}.}
+#'   \item{Vertex attributes}{Gene symbol, STRING protein IDs, protein size,
+#'     and annotation.}
+#' }
+#'
+#' @details
+#' This network is intended as the default background for
+#' \code{\link{rank_tcm_targets_by_ppi}}. STRING links represent functional
+#' associations, not only direct physical binding interactions.
+#'
+#' @source \url{https://string-db.org/}
+#' @usage data(string_human_ppi)
+"string_human_ppi"
 
 #' COVID-19 Bulk RNA-seq Demo Dataset for Machine Learning Module
 #'
