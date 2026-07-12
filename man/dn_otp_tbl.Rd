@@ -5,14 +5,10 @@
 \alias{dn_otp_tbl}
 \title{Scored Diabetic Nephropathy (DN) Targets from Open Targets Platform}
 \format{
-A data frame with columns:
-\describe{
-\item{symbol}{HGNC gene symbol.}
-\item{score}{Open Targets global association score.}
-\item{source}{Data source label, \code{"OpenTargets"}.}
-\item{...}{Additional Open Targets evidence-channel columns retained from
-the downloaded target association table.}
-}
+A data frame containing HGNC gene symbols, Open Targets global
+association scores, source labels, and the retained Open Targets
+target-annotation columns. Use \code{names(dn_otp_tbl)} to inspect all
+available fields in the installed data release.
 }
 \source{
 \url{https://platform.opentargets.org/}

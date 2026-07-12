@@ -11,7 +11,11 @@ get_gene_auc(
   group = NULL,
   use = c("auto", "train", "test"),
   ci = TRUE,
-  p_adjust_method = "BH"
+  p_adjust_method = "BH",
+  ci_method = c("delong", "bootstrap"),
+  conf_level = 0.95,
+  boot_n = 2000L,
+  seed = 2025L
 )
 }
 \arguments{
@@ -40,6 +44,15 @@ Default \code{TRUE}.}
 FDR).  Other common choices: \code{"bonferroni"}, \code{"holm"},
 \code{"none"}.  When only a single gene is supplied no correction is
 needed and \code{p_adj} equals \code{p_value} regardless of method.}
+
+\item{ci_method}{Confidence-interval method: DeLong or stratified bootstrap.}
+
+\item{conf_level}{Confidence level. Default is 0.95.}
+
+\item{boot_n}{Number of bootstrap replicates when
+\code{ci_method = "bootstrap"}.}
+
+\item{seed}{Random seed used for bootstrap confidence intervals.}
 }
 \value{
 A \code{data.frame} sorted by descending AUC with columns:

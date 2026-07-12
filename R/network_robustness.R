@@ -9,7 +9,7 @@
 #' @param g An undirected \code{igraph} object representing the PPI network.
 #' @param targets Character vector of node names to knock out (drug targets).
 #' @param n_perm Integer. Number of permutation iterations for the null
-#'   distribution.  Default is \code{100}, matching the original paper.
+#'   distribution. Default is \code{1000}.
 #' @param metrics Character vector of whole-network metrics to track. Defaults
 #'   to the original \code{ppi_knock()} metrics \code{"ASPL"}, \code{"AD"},
 #'   \code{"DC"}, and \code{"CC"}. Additional supported exploratory metrics are
@@ -22,19 +22,26 @@
 #' @param rewire_niter Integer. Multiplier for edge-swap attempts per rewiring
 #'   step (\code{ecount(g) * rewire_niter} swaps).  Default is \code{10}.
 #' @param seed Integer. Random seed for reproducibility. Default is \code{42}.
+#' @param p_method P-value family exposed through the compatibility field
+#'   \code{Pvalue}. Defaults to permutation-based empirical P-values.
+#' @param p_adjust_method P-value adjustment method passed to
+#'   \code{\link[stats]{p.adjust}}.
 #'
-#' @return A list with three elements:
+#' @return A list containing metric-level statistics, integrated scores and
+#'   P-values, and analysis parameters:
 #' \describe{
 #'   \item{Summary}{A data.frame with one row per metric (\code{ASPL},
 #'     \code{AD}, \code{DC}, \code{CC}) and columns \code{Baseline},
 #'     \code{Post_KO}, \code{Raw_RI}, \code{Mu_Random}, \code{Sd_Random},
-#'     \code{Normalized_RI} (Z-score), and \code{Pvalue}
-#'     (two-sided, normal approximation).}
+#'     \code{Normalized_RI} (Z-score), normal and empirical P-values, adjusted
+#'     empirical P-values, and the selected compatibility field
+#'     \code{Pvalue}.}
 #'   \item{Total_Score}{Numeric. The integrated disruption score
 #'     \eqn{Z_{ASPL} - Z_{AD} - Z_{DC} - Z_{CC}}.}
-#'   \item{Total_Pvalue}{Numeric. Two-sided p-value for \code{Total_Score},
-#'     derived by comparing the real combined RI against the permutation
-#'     null distribution of combined RIs.}
+#'   \item{Total_Pvalue}{Selected two-sided P-value for \code{Total_Score}.}
+#'   \item{Total_P_normal, Total_P_empirical}{Normal-approximation and direct
+#'     permutation P-values for the integrated statistic.}
+#'   \item{params}{Permutation count, seed, metrics, and P-value method.}
 #' }
 #'
 #' @references
@@ -52,7 +59,7 @@
 #' \dontrun{
 #' data(demo_ppi)
 #' targets <- "IL6"
-#' res <- ppi_knock(demo_ppi, targets, n_perm = 100)
+#' res <- ppi_knock(demo_ppi, targets, n_perm = 1000)
 #' print(res$Summary)
 #' cat("Total Score:", res$Total_Score, "\n")
 #' cat("Total P-value:", res$Total_Pvalue, "\n")
@@ -60,13 +67,17 @@
 #'
 #' @export
 ppi_knock <- function(g, targets,
-                      n_perm = 100L,
+                      n_perm = 1000L,
                       metrics = c("ASPL", "AD", "DC", "CC"),
                       weight_attr = "score",
                       rewire_niter = 10L,
-                      seed = 42L) {
+                      seed = 42L,
+                      p_method = c("empirical", "normal"),
+                      p_adjust_method = "BH") {
 
   stopifnot(inherits(g, "igraph"))
+
+  p_method <- match.arg(p_method)
 
   set.seed(seed)
 
@@ -83,6 +94,7 @@ ppi_knock <- function(g, targets,
     stop(sprintf("Edge attribute '%s' not found.", weight_attr))
 
   metric_names <- .validate_network_robustness_metrics(metrics)
+  n_perm <- .validate_perturbation_permutations(n_perm)
   n_metrics <- length(metric_names)
 
   ## Stage 1: Baseline metrics
@@ -109,12 +121,12 @@ ppi_knock <- function(g, targets,
   mu_rand <- rowMeans(rand_ri)
   sd_rand <- apply(rand_ri, 1, stats::sd)
 
-  ## Stage 4: Z-score normalisation + p-value (normal approximation)
-  sd_safe       <- ifelse(sd_rand == 0, 1, sd_rand)
-  normalized_ri <- (raw_ri - mu_rand) / sd_safe
-
-  # Two-sided p-value via Z-score (paper's 95% CI approach)
-  p_zscore <- 2 * stats::pnorm(-abs(normalized_ri))
+  ## Stage 4: Z-score normalisation and permutation inference
+  normalized_ri <- .standardize_against_null(raw_ri, mu_rand, sd_rand)
+  p_normal <- 2 * stats::pnorm(-abs(normalized_ri))
+  p_empirical <- vapply(seq_len(n_metrics), function(i) {
+    .empirical_two_sided_p(raw_ri[[i]], rand_ri[i, ])
+  }, numeric(1))
 
   ## Total Score = Z_ASPL - Z_AD - Z_DC - Z_CC
   if (all(c("ASPL", "AD", "DC", "CC") %in% metric_names)) {
@@ -126,13 +138,21 @@ ppi_knock <- function(g, targets,
     null_combined <- rand_ri["ASPL", ] - rand_ri["AD", ] - rand_ri["DC", ] - rand_ri["CC", ]
     real_combined <- raw_ri[["ASPL"]] - raw_ri[["AD"]] - raw_ri[["DC"]] - raw_ri[["CC"]]
     mu_comb  <- mean(null_combined)
-    sd_comb  <- stats::sd(null_combined)
-    sd_comb  <- ifelse(sd_comb == 0, 1, sd_comb)
-    z_total  <- (real_combined - mu_comb) / sd_comb
-    p_total  <- 2 * stats::pnorm(-abs(z_total))
+    sd_comb <- stats::sd(null_combined)
+    z_total <- .standardize_against_null(real_combined, mu_comb, sd_comb)
+    p_total_normal <- 2 * stats::pnorm(-abs(z_total))
+    p_total_empirical <- .empirical_two_sided_p(real_combined, null_combined)
   } else {
     total_score <- NA_real_
-    p_total <- NA_real_
+    p_total_normal <- NA_real_
+    p_total_empirical <- NA_real_
+  }
+
+  p_selected <- if (p_method == "empirical") p_empirical else p_normal
+  p_total_selected <- if (p_method == "empirical") {
+    p_total_empirical
+  } else {
+    p_total_normal
   }
 
   ## Summary table
@@ -144,11 +164,31 @@ ppi_knock <- function(g, targets,
     Mu_Random     = mu_rand,
     Sd_Random     = sd_rand,
     Normalized_RI = normalized_ri,
-    Pvalue        = p_zscore,
+    P_normal      = p_normal,
+    P_empirical   = p_empirical,
+    P_adjust_normal = stats::p.adjust(p_normal, method = p_adjust_method),
+    P_adjust_empirical = stats::p.adjust(p_empirical, method = p_adjust_method),
+    Pvalue        = p_selected,
     row.names     = NULL
   )
 
-  res <- list(Summary = summary_df, Total_Score = unname(total_score), Total_Pvalue = unname(p_total))
+  res <- list(
+    Summary = summary_df,
+    Total_Score = unname(total_score),
+    Total_Pvalue = unname(p_total_selected),
+    Total_P_normal = unname(p_total_normal),
+    Total_P_empirical = unname(p_total_empirical),
+    params = list(
+      targets = targets,
+      metrics = metric_names,
+      n_perm = n_perm,
+      weight_attr = weight_attr,
+      rewire_niter = rewire_niter,
+      seed = seed,
+      p_method = p_method,
+      p_adjust_method = p_adjust_method
+    )
+  )
   return(res)
 }
 
@@ -182,7 +222,7 @@ ppi_knock <- function(g, targets,
 #'   \code{"Stress"}, \code{"MCC"}, \code{"MNC"}, \code{"DMNC"},
 #'   \code{"BN"}, and \code{"EPC"}.
 #' @param n_perm Integer. Number of random perturbations for the null
-#'   distribution.
+#'   distribution. Default is \code{1000}.
 #' @param weight_attr Character. Edge attribute name for confidence weights.
 #' @param rewire_niter Integer. Multiplier for edge-swap attempts per rewiring
 #'   step, as in \code{\link{ppi_knock}}.
@@ -191,6 +231,8 @@ ppi_knock <- function(g, targets,
 #'   \code{\link[stats]{p.adjust}}.
 #' @param alpha Significance cutoff used to label affected proteins in the
 #'   protein-level summary.
+#' @param p_method P-value family exposed through the compatibility fields
+#'   \code{Pvalue} and \code{P_adjust}.
 #'
 #' @return A \code{tcm_ppi_knock_impact} object with:
 #' \describe{
@@ -204,7 +246,7 @@ ppi_knock <- function(g, targets,
 #' @importFrom igraph V vcount ecount edge_attr edge_attr_names set_edge_attr
 #'   delete_vertices rewire keeping_degseq degree strength betweenness closeness
 #'   page_rank eigen_centrality coreness transitivity eccentricity distances
-#' @importFrom stats pnorm p.adjust sd
+#' @importFrom stats ave pnorm p.adjust sd
 #'
 #' @examples
 #' \dontrun{
@@ -212,7 +254,7 @@ ppi_knock <- function(g, targets,
 #' res <- ppi_knock_impact(
 #'   demo_ppi,
 #'   targets = "IL6",
-#'   n_perm = 100
+#'   n_perm = 1000
 #' )
 #' head(res$impact)
 #' head(res$protein_summary)
@@ -222,13 +264,15 @@ ppi_knock <- function(g, targets,
 ppi_knock_impact <- function(g,
                              targets,
                              metrics = c("ASPL", "AD", "DC", "CC"),
-                             n_perm = 100L,
+                             n_perm = 1000L,
                              weight_attr = "score",
                              rewire_niter = 10L,
                              seed = 42L,
                              p_adjust_method = "BH",
-                             alpha = 0.05) {
+                             alpha = 0.05,
+                             p_method = c("empirical", "normal")) {
   stopifnot(inherits(g, "igraph"))
+  p_method <- match.arg(p_method)
   set.seed(seed)
 
   node_names <- .get_node_names(g)
@@ -242,9 +286,7 @@ ppi_knock_impact <- function(g,
   }
 
   metrics <- .validate_node_impact_metrics(metrics)
-  n_perm <- as.integer(n_perm)
-  if (n_perm < 1L) stop("n_perm must be at least 1.", call. = FALSE)
-
+  n_perm <- .validate_perturbation_permutations(n_perm)
   weights <- igraph::edge_attr(g, weight_attr)
   if (is.null(weights)) {
     stop(sprintf("Edge attribute '%s' not found.", weight_attr), call. = FALSE)
@@ -298,10 +340,8 @@ ppi_knock_impact <- function(g,
   random_mean <- apply(random_impact, c(1, 2), function(x) mean(x, na.rm = TRUE))
   random_sd <- apply(random_impact, c(1, 2), stats::sd, na.rm = TRUE)
   random_n <- apply(random_impact, c(1, 2), function(x) sum(is.finite(x)))
-  sd_safe <- ifelse(!is.finite(random_sd) | random_sd == 0, 1, random_sd)
-  z_delta <- (observed_impact - random_mean) / sd_safe
-  z_delta[!is.finite(z_delta)] <- 0
-  p_value <- 2 * stats::pnorm(-abs(z_delta))
+  z_delta <- .standardize_against_null(observed_impact, random_mean, random_sd)
+  p_normal <- 2 * stats::pnorm(-abs(z_delta))
   p_empirical <- .empirical_node_impact_p(observed_impact, random_impact, random_mean)
 
   dist_info <- .knockout_distance_info(g, remaining = remaining, targets = targets)
@@ -319,16 +359,34 @@ ppi_knock_impact <- function(g,
     random_sd = random_sd,
     random_n = random_n,
     z_delta = z_delta,
-    p_value = p_value,
+    p_value = p_normal,
     p_empirical = p_empirical,
     dist_info = dist_info
   )
-  impact$P_adjust <- stats::p.adjust(impact$Pvalue, method = p_adjust_method)
-  impact$P_adjust_metric <- ave(
-    impact$Pvalue,
+  impact$P_normal <- impact$Pvalue
+  impact$Pvalue <- if (p_method == "empirical") impact$P_empirical else impact$P_normal
+  impact$P_adjust_empirical <- stats::p.adjust(impact$P_empirical, method = p_adjust_method)
+  impact$P_adjust_normal <- stats::p.adjust(impact$P_normal, method = p_adjust_method)
+  impact$P_adjust_empirical_metric <- ave(
+    impact$P_empirical,
     impact$metric,
     FUN = function(x) stats::p.adjust(x, method = p_adjust_method)
   )
+  impact$P_adjust_normal_metric <- ave(
+    impact$P_normal,
+    impact$metric,
+    FUN = function(x) stats::p.adjust(x, method = p_adjust_method)
+  )
+  impact$P_adjust <- if (p_method == "empirical") {
+    impact$P_adjust_empirical
+  } else {
+    impact$P_adjust_normal
+  }
+  impact$P_adjust_metric <- if (p_method == "empirical") {
+    impact$P_adjust_empirical_metric
+  } else {
+    impact$P_adjust_normal_metric
+  }
   impact$direction <- ifelse(
     impact$impact_change > 0,
     "disruption_like",
@@ -338,6 +396,7 @@ ppi_knock_impact <- function(g,
   rownames(impact) <- NULL
 
   protein_summary <- .node_impact_protein_summary(impact, alpha = alpha)
+  protein_summary$p_method <- p_method
 
   out <- list(
     impact = impact,
@@ -349,12 +408,48 @@ ppi_knock_impact <- function(g,
       weight_attr = weight_attr,
       rewire_niter = rewire_niter,
       seed = seed,
+      p_method = p_method,
       p_adjust_method = p_adjust_method,
       alpha = alpha
     )
   )
   class(out) <- c("tcm_ppi_knock_impact", "list")
   return(out)
+}
+
+.validate_perturbation_permutations <- function(n_perm) {
+  n_perm <- as.integer(n_perm)
+  if (length(n_perm) != 1L || is.na(n_perm) || n_perm < 100L) {
+    stop("n_perm must be a single integer of at least 100.", call. = FALSE)
+  }
+  if (n_perm < 1000L) {
+    warning(
+      "Using fewer than 1,000 permutations gives coarse empirical P-value resolution.",
+      call. = FALSE
+    )
+  }
+  n_perm
+}
+
+.standardize_against_null <- function(observed, null_mean, null_sd) {
+  invalid <- !is.finite(null_sd) | null_sd == 0
+  if (any(invalid)) {
+    warning(
+      "Null distribution has zero or undefined variance; corresponding z-scores are NA.",
+      call. = FALSE
+    )
+  }
+  out <- (observed - null_mean) / null_sd
+  out[invalid | !is.finite(out)] <- NA_real_
+  out
+}
+
+.empirical_two_sided_p <- function(observed, random) {
+  random <- random[is.finite(random)]
+  if (!is.finite(observed) || length(random) == 0L) return(NA_real_)
+  center <- mean(random)
+  (sum(abs(random - center) >= abs(observed - center)) + 1) /
+    (length(random) + 1)
 }
 
 #' @export
@@ -700,6 +795,7 @@ print.tcm_ppi_knock_impact <- function(x, ...) {
     sig <- x$P_adjust < alpha
     sig[is.na(sig)] <- FALSE
     finite_p <- is.finite(x$P_adjust)
+    finite_abs_z <- abs(x$z_delta[is.finite(x$z_delta)])
     min_p_adjust <- if (any(finite_p)) min(x$P_adjust[finite_p]) else NA_real_
     min_p_metric <- if (any(finite_p)) x$metric[which.min(x$P_adjust)] else NA_character_
     data.frame(
@@ -711,8 +807,8 @@ print.tcm_ppi_knock_impact <- function(x, ...) {
       n_significant_metrics = sum(sig),
       min_P_adjust = min_p_adjust,
       min_P_adjust_metric = min_p_metric,
-      max_abs_z = max(abs(x$z_delta), na.rm = TRUE),
-      mean_abs_z = mean(abs(x$z_delta), na.rm = TRUE),
+      max_abs_z = if (length(finite_abs_z) > 0L) max(finite_abs_z) else NA_real_,
+      mean_abs_z = if (length(finite_abs_z) > 0L) mean(finite_abs_z) else NA_real_,
       affected = any(sig),
       stringsAsFactors = FALSE
     )

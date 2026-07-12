@@ -12,7 +12,8 @@ ml_rf(
   max_runs = 100,
   refit_on_selected = TRUE,
   seed = 2025,
-  ...
+  ...,
+  balance_method = c("none", "auto", "weights", "down")
 )
 }
 \arguments{
@@ -32,6 +33,10 @@ Default \code{20}.}
 \item{seed}{Random seed. Default \code{2025}.}
 
 \item{...}{Additional arguments forwarded to \code{\link[randomForest]{randomForest}}.}
+
+\item{balance_method}{Class-balancing strategy. \code{"weights"} passes
+training-derived class weights to Random Forest and Boruta;
+\code{"down"} downsamples training data only.}
 }
 \value{
 A \code{tcm_ml} object after feature selection.

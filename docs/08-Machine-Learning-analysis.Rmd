@@ -46,7 +46,7 @@ cat(genes, sep = ", ")
 
 ### Data preparation {#ml-prepare}
 
-`prepare_ml_data()` converts a gene × sample expression matrix into a structured `tcm_ml_data` object that all downstream modelling functions accept. It handles level reordering (so that the positive class is always `levels[1]`), zero-variance gene removal, and syntactic name cleaning.
+`prepare_ml_data()` converts a gene × sample expression matrix into a structured `tcm_ml_data` object that all downstream modelling functions accept. It handles level reordering (so that the positive class is always `levels[1]`), zero-variance gene removal, syntactic name cleaning, and training/test class-distribution summaries. It does not normalize raw counts, correct batch effects, or impute missing values; users should supply an appropriately normalized numeric expression matrix. In strict validation settings, any data-dependent preprocessing should be estimated from the training data and then applied unchanged to the corresponding validation data.
 
 For Mode A (full cross-validation, no hold-out), simply pass the matrix, group labels, and the desired positive class:
 
@@ -67,6 +67,25 @@ ml_data <- prepare_ml_data(
 | `split` | Logical; `TRUE` activates Mode B (internal split) | `FALSE` |
 | `train_ratio` | Training fraction for Mode B | 0.7 |
 | `test_expr` / `test_group` | External test data for Mode C | `NULL` |
+| `imbalance_threshold` | Minority fraction below which training data are flagged | 0.25 |
+| `imbalance_action` | Report imbalance by warning, message, or neither | `"warn"` |
+
+The detected training distribution is available in `ml_data$class_balance`. Model behavior is unchanged unless `balance_method` is explicitly set. The available strategies are:
+
+| `balance_method` | Behaviour |
+|------------------|-----------|
+| `"none"` | Preserve the observed class distribution (default and backward-compatible) |
+| `"auto"` | Apply model-appropriate balancing only when the minority fraction is below `imbalance_threshold` |
+| `"weights"` | Use training-derived class or case weights (not supported by SVM-RFE) |
+| `"down"` | Downsample the majority class; SVM-RFE performs this within resampling folds |
+
+With `balance_method = "auto"`, LASSO/ENET/RF/XGBoost use training-derived weights, whereas SVM-RFE uses fold-internal downsampling. Validation and external-test samples are never used to derive balancing weights or sampling decisions.
+
+```{r ml-class-balance, eval=FALSE}
+ml_data$class_balance
+res_lasso_weighted <- ml_lasso(ml_data, balance_method = "auto")
+res_lasso_weighted$balance_info
+```
 
 ---
 
@@ -214,11 +233,37 @@ cat(consensus, sep = ", ")
 
 #### ROC curves
 
-The ROC curves visualise discrimination performance for each method. In Mode A, curves are derived from out-of-fold / out-of-bag predictions, providing an honest assessment without data leakage:
+The ROC curves visualise discrimination performance for each method. In Mode A, curves are derived from out-of-fold / out-of-bag predictions rather than direct in-sample predictions. However, this alone does not guarantee a fully leakage-free estimate if candidate filtering or model selection was performed using the complete dataset; nested cross-validation should be used when strict internal performance estimation is required:
 
 ```{r ml-roc, eval=TRUE, fig.width=7, fig.height=6, fig.align='center', out.width='80%', collapse=FALSE}
 plot_ml_roc(ml_list)
 ```
+
+---
+
+## Nested cross-validation {#ml-nested-cv}
+
+When no independent external cohort is available, `evaluate_ml_nested_cv()` places feature selection, tuning, preprocessing, and optional class balancing inside each outer training fold. The held-out outer fold is used only once for prediction. This produces patient-level out-of-fold probabilities, DeLong AUC confidence intervals, and feature-selection frequencies without changing the existing single-model workflow.
+
+The outer loop estimates performance on samples that were not used for feature selection or tuning, whereas the inner loop selects model settings using only the corresponding outer-training samples. Candidate genes supplied before calling the function define the available feature space; outcome-guided filtering performed outside the function can still introduce information leakage and should therefore be avoided.
+
+```{r ml-nested-cv, eval=FALSE}
+nested <- evaluate_ml_nested_cv(
+  ml_data,
+  methods = c("lasso", "rf", "svm_rfe", "xgboost"),
+  outer_folds = 5,
+  inner_folds = 5,
+  balance_method = "auto",
+  seed = 2025
+)
+
+nested$performance
+head(nested$feature_stability)
+```
+
+The main outputs are `performance` (patient-level AUC and 95% CI), `predictions` and `aggregated_predictions` (outer-fold probabilities), `feature_stability` (selection frequencies), and `fold_indices` (auditable train/validation membership). `outer_folds` and `outer_repeats` control performance estimation, while `inner_folds` and `inner_repeats` control model selection within each outer-training partition.
+
+For Mode B/C objects, nested CV uses only `train_x` and `train_y`; the existing hold-out or external test set remains isolated. With repeated outer CV, probabilities are first averaged per sample before calculating one patient-level ROC and confidence interval. Nested CV is an internal validation procedure and should not be described as external validation.
 
 ---
 
@@ -363,8 +408,15 @@ TCMDATA provides three companion functions for this purpose.
 ### AUC summary table
 
 `get_gene_auc()` treats each gene's expression as a univariate predictor and
-returns a tidy table with AUC, 95% DeLong CI, optimal cutoff (Youden's J),
-sensitivity, specificity and a test against AUC = 0.5.
+returns a tidy table with AUC, 95% DeLong or stratified-bootstrap CI, optimal
+cutoff (Youden's J), sensitivity, specificity, class counts, evaluation set,
+and a status field. Constant or all-missing genes return an NA status row
+without interrupting the remaining genes.
+
+Here, the DeLong method is used to estimate the confidence interval of each
+single ROC curve; this is distinct from a DeLong test comparing the AUCs of
+two models. These gene-wise AUCs describe discrimination in the selected
+evaluation set and do not constitute independent validation.
 
 ```{r ml-gene-auc, eval=TRUE}
 consensus <- get_ml_consensus(ml_list, min_methods = 3)
@@ -374,6 +426,10 @@ top4 <- consensus[1:min(4, length(consensus))]
 auc_tbl <- get_gene_auc(top4, ml_data = ml_data)
 auc_tbl
 ```
+
+For a nonparametric interval, use `ci_method = "bootstrap"` and set `boot_n`
+(default 2,000). Mode B/C uses the test set automatically; Mode A results are
+marked as training-set descriptive estimates.
 
 Both `ml_data` (from `prepare_ml_data()`) and raw `expr_mat + group` are
 accepted.  When `ml_data` is Mode B / C, the **test set** is used

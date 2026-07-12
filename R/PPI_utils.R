@@ -120,7 +120,9 @@ ppi_subset <- function(ppi_obj,
 #' @importFrom igraph degree strength betweenness closeness
 #' @importFrom igraph eigen_centrality page_rank coreness
 #' @importFrom igraph transitivity eccentricity articulation_points
-#' @return The input \code{igraph} object with additional vertex
+#' @return The input \code{igraph} object with additional vertex attributes,
+#'   including raw \code{eccentricity} and reciprocal
+#'   \code{eccentricity_centrality}.
 #' @examples
 #' data(demo_ppi)
 #' library(igraph)
@@ -183,7 +185,13 @@ compute_nodeinfo <- function(g, weight_attr = "score", normalize = FALSE, seed =
   V(g)$clustering_coef <- igraph::transitivity(g, type = "local", isolates = "zero")
 
   message("Calculating eccentricity ...")
-  V(g)$eccentricity <- igraph::eccentricity(g)
+  eccentricity <- igraph::eccentricity(g)
+  V(g)$eccentricity <- eccentricity
+  V(g)$eccentricity_centrality <- ifelse(
+    is.finite(eccentricity) & eccentricity > 0,
+    1 / eccentricity,
+    0
+  )
 
   message("Detecting articulation points ...")
   art <- igraph::articulation_points(g)
@@ -225,15 +233,20 @@ compute_nodeinfo <- function(g, weight_attr = "score", normalize = FALSE, seed =
 #' Rank PPI nodes by integrated network centrality
 #'
 #' @param g An igraph object that has already been processed by \code{compute_nodeinfo()} or have added node metrics manually.
-#' @param metrics Character vector; which vertex attributes to use for scoring. Defaults are the same as Cytohubba.
-#' @param weights Numeric vector of the same length as metrics; relative weights for each metric. If NULL (default), all metrics are equally weighted.
+#' @param metrics Character vector; vertex attributes used for scoring.
+#' @param weights Numeric vector of the same length as metrics, or a named
+#'   vector matched to resolved metric names. If NULL, metrics are equally
+#'   weighted.
 #' @param use_weight Logical; whether use weighted metrics(beweenness and closeness) instead. Default is TRUE.
 #' @param na_rm Logical; if TRUE, NAs are ignored in normalization (set to 0.5).
 #'
 #' @importFrom igraph vertex_attr V
 #' @return A list with:
 #'   \item{graph}{igraph object with added vertex attributes \code{Score_network} and \code{Rank_network}.}
-#'   \item{table}{data.frame with node-level metrics and scores, sorted by \code{Rank_network}.}
+#'   \item{table}{data.frame with node-level metrics, normalized scoring
+#'     columns, and scores, sorted by \code{Rank_network}.}
+#'   \item{scoring}{Resolved metric names, normalized weights, normalization
+#'     method, and score direction.}
 #'
 #' @examples
 #' data(demo_ppi)
@@ -252,7 +265,7 @@ rank_ppi_nodes <- function(g,
                              "degree",
                              "betweenness",
                              "closeness",
-                             "eccentricity",
+                             "eccentricity_centrality",
                              "radiality",
                              "Stress",
                              "MCC",
@@ -268,24 +281,42 @@ rank_ppi_nodes <- function(g,
   available_metrics <- names(igraph::vertex_attr(g))
   message("Available metrics in graph: ", paste(available_metrics, collapse=", "))
 
-  if (use_weight){
-    metrics <- c("degree",
-                 "betweenness_w",
-                 "closeness_w",
-                 "eccentricity",
-                 "radiality",
-                 "Stress",
-                 "MCC",
-                 "MNC",
-                 "DMNC",
-                 "BN",
-                 "EPC")
-  }
-
   vdat <- igraph::vertex_attr(g)
   df <- as.data.frame(vdat, stringsAsFactors = FALSE)
 
-  metrics <- intersect(metrics, names(df))
+  metrics <- unique(as.character(metrics))
+  if (isTRUE(use_weight)) {
+    replacements <- c(betweenness = "betweenness_w", closeness = "closeness_w")
+    fallbacks <- character()
+    for (raw_metric in names(replacements)) {
+      idx <- which(metrics == raw_metric)
+      if (length(idx) == 0L) next
+      weighted_metric <- replacements[[raw_metric]]
+      weighted_available <- weighted_metric %in% names(df) &&
+        any(is.finite(suppressWarnings(as.numeric(df[[weighted_metric]]))))
+      if (weighted_available) {
+        metrics[idx] <- weighted_metric
+      } else {
+        fallbacks <- c(fallbacks, paste0(weighted_metric, " -> ", raw_metric))
+      }
+    }
+    if (length(fallbacks) > 0L) {
+      warning(
+        "Weighted metric(s) unavailable; falling back: ",
+        paste(fallbacks, collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
+  }
+  metrics <- unique(metrics)
+  missing_metrics <- setdiff(metrics, names(df))
+  if (length(missing_metrics) > 0L) {
+    warning(
+      "Dropping unavailable metric(s): ", paste(missing_metrics, collapse = ", "),
+      call. = FALSE
+    )
+    metrics <- intersect(metrics, names(df))
+  }
   if (length(metrics) == 0L) {
     stop("None of the requested metrics are present in vertex attributes.")
   }
@@ -295,15 +326,39 @@ rank_ppi_nodes <- function(g,
   # default: each metrics are equally weighted
   if (is.null(weights)) {
     weights <- rep(1, length(metrics))
+  } else if (!is.null(names(weights)) && any(nzchar(names(weights)))) {
+    if (anyDuplicated(names(weights))) {
+      stop("Named 'weights' must have unique names.", call. = FALSE)
+    }
+    missing_weights <- setdiff(metrics, names(weights))
+    if (length(missing_weights) > 0L) {
+      stop(
+        "Named 'weights' must match all resolved metrics; missing: ",
+        paste(missing_weights, collapse = ", "),
+        call. = FALSE
+      )
+    }
+    weights <- weights[metrics]
   }
   if (length(weights) != length(metrics)) {
     stop("Length of 'weights' must match length of 'metrics'.")
   }
+  weights <- suppressWarnings(as.numeric(weights))
+  if (any(!is.finite(weights)) || any(weights < 0)) {
+    stop("All 'weights' must be finite and non-negative.", call. = FALSE)
+  }
+  if (sum(weights) <= 0) {
+    stop("'weights' must have a positive sum.", call. = FALSE)
+  }
   # normalize weights
   weights <- weights / sum(weights)
+  names(weights) <- metrics
 
   M_raw  <- df[ , metrics, drop = FALSE]
-  M_norm <- as.data.frame(lapply(M_raw, norm01))
+  M_norm <- as.data.frame(lapply(M_raw, norm01, na_rm = na_rm))
+  norm_names <- paste0(metrics, "_norm")
+  names(M_norm) <- norm_names
+  df[norm_names] <- M_norm
 
   # calculate total scores
   Score_network <- as.numeric(as.matrix(M_norm) %*% weights)
@@ -318,7 +373,16 @@ rank_ppi_nodes <- function(g,
 
   df_out <- df[order(df$Rank_network), ]
 
-  return(list(graph = g, table = df_out))
+  return(list(
+    graph = g,
+    table = df_out,
+    scoring = list(
+      metrics = metrics,
+      weights = weights,
+      normalization = "minmax",
+      direction = stats::setNames(rep("higher_is_better", length(metrics)), metrics)
+    )
+  ))
 }
 
 

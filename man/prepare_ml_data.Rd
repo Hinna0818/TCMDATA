@@ -14,7 +14,9 @@ prepare_ml_data(
   train_idx = NULL,
   test_expr = NULL,
   test_group = NULL,
-  seed = 2025
+  seed = 2025,
+  imbalance_threshold = 0.25,
+  imbalance_action = c("warn", "message", "none")
 )
 }
 \arguments{
@@ -39,9 +41,16 @@ preserved; otherwise levels are sorted alphabetically.}
 \item{test_group}{Labels for \code{test_expr} (required if \code{test_expr} given).}
 
 \item{seed}{Random seed. Default is 2025.}
+
+\item{imbalance_threshold}{Minority-class fraction below which the training
+data are flagged as imbalanced. Default is 0.25.}
+
+\item{imbalance_action}{How to report detected imbalance: a warning, a
+message, or no condition.}
 }
 \value{
-A \code{tcm_ml_data} list: \code{train_x}, \code{train_y}, \code{test_x}, \code{test_y}, \code{gene_names}, \code{levels}, \code{full_cv}.
+A \code{tcm_ml_data} list containing the original train/test fields plus
+training and optional test class-balance summaries.
 }
 \description{
 Supports three modes:

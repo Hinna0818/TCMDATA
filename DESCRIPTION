@@ -1,6 +1,6 @@
 Package: TCMDATA
 Title: Traditional Chinese Medicine Data Analysis and Visualization
-Version: 0.1.0
+Version: 1.0.0
 Authors@R: c(
     person(given = "Nan",         family = "He", email = "nanh302311@gmail.com",    role = c("aut", "cre"), comment = c(ORCID = "0009-0008-6932-3867")),
     person(given = "Guangchuang", family = "Yu", email = "guangchuangyu@gmail.com", role = c("aut", "ths"), comment = c(ORCID = "0000-0002-6485-8781")),
@@ -77,4 +77,5 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 LazyData: true
+LazyDataCompression: xz
 Config/testthat/edition: 3

@@ -17,7 +17,8 @@ ml_svm_rfe(
   cv_folds = 5,
   cv_repeats = 5,
   seed = 2025,
-  ...
+  ...,
+  balance_method = c("none", "auto", "weights", "down")
 )
 }
 \arguments{
@@ -54,6 +55,11 @@ When \code{"ROC"} / \code{"Sens"} / \code{"Spec"} is used,
 \item{seed}{Random seed. Default 2025.}
 
 \item{...}{Passed to \code{\link[caret:rfe]{caret::rfe()}}.}
+
+\item{balance_method}{Class-balancing strategy. SVM-RFE supports
+\code{"none"}, \code{"auto"}, and fold-internal \code{"down"}; explicit
+\code{"weights"} is rejected because the underlying SVM path does not use
+those weights reliably.}
 }
 \value{
 A \code{tcm_ml} object with \code{$rfe_result}, \code{$profile}, \code{$genes}.

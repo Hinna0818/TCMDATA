@@ -213,3 +213,48 @@ test_that("select_tcm_targets filters ranking results", {
   )
   expect_equal(selected_targets, "A")
 })
+
+test_that("select_tcm_targets defaults to final no-self p-values", {
+  ranking <- data.frame(
+    target = c("A", "B"),
+    Score_final = c(2, 1),
+    Rank_final = c(1, 2),
+    p_empirical = c(0.01, 0.8),
+    p_adjust = c(0.02, 0.8),
+    p_empirical_no_self = c(0.7, 0.01),
+    p_adjust_no_self = c(0.7, 0.02),
+    stringsAsFactors = FALSE
+  )
+
+  expect_equal(
+    select_tcm_targets(ranking, top_n = NULL, max_p = 0.05)$target,
+    "B"
+  )
+  expect_equal(
+    select_tcm_targets(
+      ranking, top_n = NULL, max_p = 0.05, p_variant = "raw"
+    )$target,
+    "A"
+  )
+})
+
+test_that("character disease targets remain an explicit binary fallback", {
+  expect_warning(
+    disease <- .tw_as_disease_weights(c("IL6", "TNF")),
+    "binary disease-target evidence"
+  )
+  expect_equal(disease$disease_weight, c(1, 1))
+  expect_true(all(grepl("binary_unscored", disease$source_detail)))
+})
+
+test_that("disease score normalization records its method and raw range", {
+  disease <- prepare_disease_weights(
+    GeneCards = data.frame(symbol = c("IL6", "TNF"), score = c(20, 80)),
+    score_normalization = "minmax"
+  )
+  metadata <- attr(disease, "score_normalization")
+
+  expect_equal(metadata$requested, "minmax")
+  expect_equal(metadata$by_source$GeneCards$method, "minmax")
+  expect_equal(metadata$by_source$GeneCards$raw_range, c(20, 80))
+})

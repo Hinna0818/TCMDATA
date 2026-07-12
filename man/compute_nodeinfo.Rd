@@ -16,7 +16,9 @@ compute_nodeinfo(g, weight_attr = "score", normalize = FALSE, seed = 42)
 \item{seed}{Numeric; Random seed for function \code{compute_EPC}. Default is 42.}
 }
 \value{
-The input \code{igraph} object with additional vertex
+The input \code{igraph} object with additional vertex attributes,
+including raw \code{eccentricity} and reciprocal
+\code{eccentricity_centrality}.
 }
 \description{
 Compute some useful metrics for PPI nodes
