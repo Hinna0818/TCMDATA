@@ -96,7 +96,7 @@
 #' For each gene the function treats its expression as a univariate predictor,
 #' computes a ROC curve via \pkg{pROC}, and returns a summary table with AUC,
 #' 95 \% DeLong confidence interval, optimal cutoff (Youden's J), sensitivity,
-#' specificity and a one-sided test against AUC = 0.5.
+#' specificity and a two-sided test against AUC = 0.5.
 #'
 #' @param genes Character vector of gene symbols to evaluate.
 #' @param ml_data A \code{tcm_ml_data} object from \code{\link{prepare_ml_data}}
