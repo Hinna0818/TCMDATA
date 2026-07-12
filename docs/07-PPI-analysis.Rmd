@@ -221,6 +221,26 @@ rank_df[1:10, c("name", "degree", "betweenness_w", "closeness_w",
                 "MCC", "MNC", "EPC", "Score_network", "Rank_network")]
 ```
 
+### Correlation-adjusted metric weights
+
+When several metrics are strongly positively correlated, `calculate_metric_weights()` groups them using complete-linkage clustering and gives each group equal total weight. The suggested weights reduce redundant contributions but do not estimate biological importance. The returned correlation matrix, paired-observation counts, and cluster assignments can be inspected before use. Pass the resolved metric names from `names(metric_weights$weights)` to `rank_ppi_nodes()`, as shown below.
+
+```{r ppi-metric-weights, eval=FALSE}
+metric_weights <- calculate_metric_weights(
+  ppi_scored,
+  metrics = c("degree", "betweenness", "closeness",
+              "eccentricity_centrality", "MCC", "MNC", "EPC"),
+  correlation_threshold = 0.8
+)
+
+rank_res <- rank_ppi_nodes(
+  ppi_scored,
+  metrics = names(metric_weights$weights),
+  weights = metric_weights$weights,
+  use_weight = FALSE
+)
+```
+
 ### Radar plot of topological metrics
 
 For a target of interest, `get_node_profile()` + `radar_plot()` produces a radar chart showing its normalized centrality fingerprint across multiple dimensions:

@@ -230,6 +230,264 @@ compute_nodeinfo <- function(g, weight_attr = "score", normalize = FALSE, seed =
 }
 
 
+#' Suggest correlation-adjusted weights for PPI node metrics
+#'
+#' Groups strongly positively correlated node metrics and assigns equal total
+#' weight to each group. Metrics within the same group share that weight
+#' equally. The resulting weights reduce redundancy in an integrated network
+#' score but do not represent optimized biological importance.
+#' Pass the names and values of the returned weights to `rank_ppi_nodes()` so
+#' resolved and retained metrics remain aligned.
+#'
+#' @param g An igraph object with node metrics stored as vertex attributes.
+#' @param metrics Character vector of vertex attributes to assess.
+#' @param use_weight Logical; if \code{TRUE}, use \code{betweenness_w} and
+#'   \code{closeness_w} when available. Raw \code{eccentricity} is replaced by
+#'   \code{eccentricity_centrality} when the latter is available.
+#' @param correlation_method Correlation method; either \code{"spearman"}
+#'   (default) or \code{"pearson"}.
+#' @param correlation_threshold Positive correlation threshold used to define
+#'   metric groups. Must be greater than 0 and no greater than 1.
+#' @param clustering_method Linkage method passed to \code{stats::hclust()}.
+#'   Complete linkage is the default so every pair of metrics in a group meets
+#'   the correlation threshold.
+#'
+#' @return An object of class \code{tcm_metric_weights} containing:
+#'   \item{weights}{Named suggested weights that sum to 1.}
+#'   \item{metric_groups}{Metric-level cluster assignments and weights.}
+#'   \item{correlation}{Signed metric correlation matrix.}
+#'   \item{pairwise_n}{Number of finite paired observations used for each
+#'     metric correlation.}
+#'   \item{clustering}{Hierarchical clustering object, or \code{NULL} when one
+#'     informative metric remains.}
+#'   \item{requested_metrics}{Metrics supplied by the user.}
+#'   \item{resolved_metrics}{Informative metrics used in the calculation.}
+#'   \item{dropped_metrics}{Unavailable or non-informative metrics.}
+#'   \item{params}{Calculation settings.}
+#'
+#' @examples
+#' g <- igraph::make_ring(6)
+#' igraph::V(g)$degree_score <- c(1, 3, 2, 6, 4, 5)
+#' igraph::V(g)$hub_score <- c(2, 6, 4, 12, 8, 10)
+#' metric_weights <- calculate_metric_weights(
+#'   g,
+#'   metrics = c("degree_score", "hub_score"),
+#'   use_weight = FALSE
+#' )
+#' metric_weights$weights
+#' rank_ppi_nodes(
+#'   g,
+#'   metrics = names(metric_weights$weights),
+#'   weights = metric_weights$weights,
+#'   use_weight = FALSE
+#' )$table
+#'
+#' @export
+calculate_metric_weights <- function(
+    g,
+    metrics = c(
+      "degree",
+      "betweenness",
+      "closeness",
+      "eccentricity_centrality",
+      "radiality",
+      "Stress",
+      "MCC",
+      "MNC",
+      "DMNC",
+      "BN",
+      "EPC"
+    ),
+    use_weight = TRUE,
+    correlation_method = c("spearman", "pearson"),
+    correlation_threshold = 0.8,
+    clustering_method = c("complete", "average", "single")) {
+  if (!inherits(g, "igraph")) {
+    stop("'g' must be an igraph object.", call. = FALSE)
+  }
+  if (!is.character(metrics) || length(metrics) == 0L ||
+      anyNA(metrics) || any(!nzchar(metrics))) {
+    stop("'metrics' must be a non-empty character vector.", call. = FALSE)
+  }
+  if (!is.logical(use_weight) || length(use_weight) != 1L || is.na(use_weight)) {
+    stop("'use_weight' must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (!is.numeric(correlation_threshold) ||
+      length(correlation_threshold) != 1L ||
+      !is.finite(correlation_threshold) ||
+      correlation_threshold <= 0 || correlation_threshold > 1) {
+    stop(
+      "'correlation_threshold' must be greater than 0 and no greater than 1.",
+      call. = FALSE
+    )
+  }
+  correlation_method <- match.arg(correlation_method)
+  clustering_method <- match.arg(clustering_method)
+
+  requested_metrics <- unique(metrics)
+  resolved_metrics <- requested_metrics
+  vertex_data <- igraph::vertex_attr(g)
+
+  if (isTRUE(use_weight)) {
+    replacements <- c(
+      betweenness = "betweenness_w",
+      closeness = "closeness_w"
+    )
+    fallbacks <- character()
+    for (raw_metric in names(replacements)) {
+      idx <- which(resolved_metrics == raw_metric)
+      if (length(idx) == 0L) next
+      weighted_metric <- replacements[[raw_metric]]
+      weighted_available <- weighted_metric %in% names(vertex_data) &&
+        any(is.finite(suppressWarnings(
+          as.numeric(vertex_data[[weighted_metric]])
+        )))
+      if (weighted_available) {
+        resolved_metrics[idx] <- weighted_metric
+      } else {
+        fallbacks <- c(fallbacks, paste0(weighted_metric, " -> ", raw_metric))
+      }
+    }
+    if (length(fallbacks) > 0L) {
+      warning(
+        "Weighted metric(s) unavailable; falling back: ",
+        paste(fallbacks, collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
+  }
+
+  if ("eccentricity" %in% resolved_metrics &&
+      "eccentricity_centrality" %in% names(vertex_data)) {
+    resolved_metrics[resolved_metrics == "eccentricity"] <-
+      "eccentricity_centrality"
+  }
+  resolved_metrics <- unique(resolved_metrics)
+
+  unavailable <- setdiff(resolved_metrics, names(vertex_data))
+  available <- setdiff(resolved_metrics, unavailable)
+  metric_values <- lapply(available, function(metric) {
+    suppressWarnings(as.numeric(vertex_data[[metric]]))
+  })
+  names(metric_values) <- available
+  informative <- vapply(metric_values, function(x) {
+    finite <- x[is.finite(x)]
+    length(finite) >= 3L && length(unique(finite)) >= 2L
+  }, logical(1))
+  non_informative <- names(informative)[!informative]
+  used_metrics <- names(informative)[informative]
+
+  dropped_metrics <- rbind(
+    data.frame(
+      metric = non_informative,
+      reason = rep("non_informative", length(non_informative)),
+      stringsAsFactors = FALSE
+    ),
+    data.frame(
+      metric = unavailable,
+      reason = rep("unavailable", length(unavailable)),
+      stringsAsFactors = FALSE
+    )
+  )
+  rownames(dropped_metrics) <- NULL
+  if (nrow(dropped_metrics) > 0L) {
+    warning(
+      "Metric(s) dropped before correlation analysis: ",
+      paste(
+        paste0(dropped_metrics$metric, " (", dropped_metrics$reason, ")"),
+        collapse = ", "
+      ),
+      ".",
+      call. = FALSE
+    )
+  }
+  if (length(used_metrics) == 0L) {
+    stop("No informative requested metrics are available.", call. = FALSE)
+  }
+
+  metric_matrix <- do.call(cbind, metric_values[used_metrics])
+  colnames(metric_matrix) <- used_metrics
+  metric_matrix[!is.finite(metric_matrix)] <- NA_real_
+  pairwise_n <- crossprod(is.finite(metric_matrix))
+  dimnames(pairwise_n) <- list(used_metrics, used_metrics)
+  if (length(used_metrics) == 1L) {
+    correlation <- matrix(
+      1,
+      nrow = 1,
+      ncol = 1,
+      dimnames = list(used_metrics, used_metrics)
+    )
+    clustering <- NULL
+    clusters <- stats::setNames(1L, used_metrics)
+  } else {
+    correlation <- stats::cor(
+      metric_matrix,
+      use = "pairwise.complete.obs",
+      method = correlation_method
+    )
+    diag(correlation) <- 1
+    insufficient_pairs <- pairwise_n < 3L
+    diag(insufficient_pairs) <- FALSE
+    correlation[insufficient_pairs] <- NA_real_
+    unresolved <- is.na(correlation)
+    diag(unresolved) <- FALSE
+    clustering_correlation <- correlation
+    if (any(unresolved)) {
+      warning(
+        "Undefined correlations or correlations based on fewer than 3 paired ",
+        "observations were treated as zero for clustering and retained as NA ",
+        "in the returned correlation matrix.",
+        call. = FALSE
+      )
+      clustering_correlation[unresolved] <- 0
+    }
+    clustering <- stats::hclust(
+      stats::as.dist(1 - pmax(clustering_correlation, 0)),
+      method = clustering_method
+    )
+    clusters <- stats::cutree(
+      clustering,
+      h = 1 - correlation_threshold
+    )
+  }
+
+  cluster_sizes <- table(clusters)
+  cluster_count <- length(cluster_sizes)
+  weights <- vapply(names(clusters), function(metric) {
+    1 / cluster_count / unname(cluster_sizes[as.character(clusters[[metric]])])
+  }, numeric(1))
+  names(weights) <- names(clusters)
+  weights <- weights / sum(weights)
+
+  metric_groups <- data.frame(
+    metric = names(clusters),
+    cluster = unname(clusters),
+    cluster_size = as.integer(cluster_sizes[as.character(clusters)]),
+    weight = unname(weights),
+    stringsAsFactors = FALSE
+  )
+
+  result <- list(
+    weights = weights,
+    metric_groups = metric_groups,
+    correlation = correlation,
+    pairwise_n = pairwise_n,
+    clustering = clustering,
+    requested_metrics = requested_metrics,
+    resolved_metrics = used_metrics,
+    dropped_metrics = dropped_metrics,
+    params = list(
+      use_weight = use_weight,
+      correlation_method = correlation_method,
+      correlation_threshold = correlation_threshold,
+      clustering_method = clustering_method
+    )
+  )
+  class(result) <- c("tcm_metric_weights", "list")
+  result
+}
+
+
 #' Rank PPI nodes by integrated network centrality
 #'
 #' @param g An igraph object that has already been processed by \code{compute_nodeinfo()} or have added node metrics manually.
