@@ -8,12 +8,13 @@ ppi_knock_impact(
   g,
   targets,
   metrics = c("ASPL", "AD", "DC", "CC"),
-  n_perm = 100L,
+  n_perm = 1000L,
   weight_attr = "score",
   rewire_niter = 10L,
   seed = 42L,
   p_adjust_method = "BH",
-  alpha = 0.05
+  alpha = 0.05,
+  p_method = c("empirical", "normal")
 )
 }
 \arguments{
@@ -36,7 +37,7 @@ closeness centrality. Additional supported exploratory metrics include
 \code{"BN"}, and \code{"EPC"}.}
 
 \item{n_perm}{Integer. Number of random perturbations for the null
-distribution.}
+distribution. Default is \code{1000}.}
 
 \item{weight_attr}{Character. Edge attribute name for confidence weights.}
 
@@ -50,6 +51,9 @@ step, as in \code{\link{ppi_knock}}.}
 
 \item{alpha}{Significance cutoff used to label affected proteins in the
 protein-level summary.}
+
+\item{p_method}{P-value family exposed through the compatibility fields
+\code{Pvalue} and \code{P_adjust}.}
 }
 \value{
 A \code{tcm_ppi_knock_impact} object with:
@@ -79,7 +83,7 @@ data(demo_ppi)
 res <- ppi_knock_impact(
   demo_ppi,
   targets = "IL6",
-  n_perm = 100
+  n_perm = 1000
 )
 head(res$impact)
 head(res$protein_summary)

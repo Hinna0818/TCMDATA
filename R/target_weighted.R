@@ -30,6 +30,9 @@
 #'   are rejected. Set to \code{FALSE} only for exploratory analyses where a
 #'   source-level binary evidence fallback is intentional.
 #' @param method How to combine multiple evidence rows per gene.
+#' @param score_normalization Disease-score normalization: preserve scores,
+#'   min-max normalize within each source, or \code{"auto"} to retain scores
+#'   already between 0 and 1 and min-max normalize other ranges.
 #'
 #' @return A data frame with one row per gene and columns \code{symbol},
 #'   \code{disease_weight}, \code{sources}, \code{n_sources},
@@ -62,9 +65,11 @@ prepare_disease_weights <- function(...,
                                     deg_score = FALSE,
                                     deg_score_method = c("effect_significance", "wald_stat"),
                                     require_score = TRUE,
-                                    method = c("noisy_or", "weighted_mean", "max")) {
+                                    method = c("noisy_or", "weighted_mean", "max"),
+                                    score_normalization = c("auto", "none", "minmax")) {
   method <- match.arg(method)
   deg_score_method <- match.arg(deg_score_method)
+  score_normalization <- match.arg(score_normalization)
   inputs <- list(...)
   input_names <- names(inputs)
   if (is.null(input_names)) input_names <- rep("", length(inputs))
@@ -74,6 +79,7 @@ prepare_disease_weights <- function(...,
   }
 
   evidence <- list()
+  normalization_meta <- list()
   for (i in seq_along(inputs)) {
     source_name <- input_names[[i]]
     if (is.null(source_name) || !nzchar(source_name)) source_name <- "user"
@@ -85,8 +91,10 @@ prepare_disease_weights <- function(...,
       source_col = source_col,
       deg_score = deg_score,
       deg_score_method = deg_score_method,
-      require_score = require_score
+      require_score = require_score,
+      score_normalization = score_normalization
     )
+    normalization_meta[[source_name]] <- attr(evidence[[i]], "score_normalization")
   }
 
   evidence <- do.call(rbind, evidence)
@@ -129,6 +137,10 @@ prepare_disease_weights <- function(...,
   out <- do.call(rbind, out)
   out <- out[order(-out$disease_weight, out$symbol), , drop = FALSE]
   rownames(out) <- NULL
+  attr(out, "score_normalization") <- list(
+    requested = score_normalization,
+    by_source = normalization_meta
+  )
   out
 }
 
@@ -244,7 +256,7 @@ prepare_herb_target_weights <- function(herb_df,
 #'   \code{params}.
 #'
 #' @importFrom igraph V distances degree vcount ecount components edge_attr_names edge_attr
-#' @importFrom stats p.adjust sd setNames
+#' @importFrom stats p.adjust sd setNames weighted.mean
 #'
 #' @export
 rank_tcm_targets_by_ppi <- function(herb_targets,
@@ -466,6 +478,9 @@ rank_tcm_targets_by_ppi <- function(herb_targets,
 #' @param direct_overlap Optional logical filter for direct disease-target
 #'   overlap.
 #' @param return Character. Return the selected table or only target symbols.
+#' @param p_variant P-value family used by \code{max_p} and
+#'   \code{max_p_adjust}. The default \code{"final"} uses no-self proximity
+#'   statistics when available; \code{"raw"} uses the original proximity.
 #'
 #' @return A data frame or character vector.
 #'
@@ -479,8 +494,10 @@ select_tcm_targets <- function(x,
                                max_p = NULL,
                                max_p_adjust = NULL,
                                direct_overlap = NULL,
-                               return = c("table", "targets")) {
+                               return = c("table", "targets"),
+                               p_variant = c("final", "no_self", "raw")) {
   return <- match.arg(return)
+  p_variant <- match.arg(p_variant)
   df <- if (inherits(x, "tcm_ppi_rank")) x$result else x
   if (!is.data.frame(df)) {
     stop("x must be a tcm_ppi_rank object or a ranking data frame.", call. = FALSE)
@@ -494,8 +511,19 @@ select_tcm_targets <- function(x,
   keep <- rep(TRUE, nrow(df))
   if (!is.null(min_score)) keep <- keep & df$Score_final >= min_score
   if (!is.null(min_z) && "z_proximity" %in% names(df)) keep <- keep & df$z_proximity >= min_z
-  if (!is.null(max_p) && "p_empirical" %in% names(df)) keep <- keep & df$p_empirical <= max_p
-  if (!is.null(max_p_adjust) && "p_adjust" %in% names(df)) keep <- keep & df$p_adjust <= max_p_adjust
+  use_no_self <- p_variant %in% c("final", "no_self")
+  p_col <- if (use_no_self && "p_empirical_no_self" %in% names(df)) {
+    "p_empirical_no_self"
+  } else {
+    "p_empirical"
+  }
+  p_adjust_col <- if (use_no_self && "p_adjust_no_self" %in% names(df)) {
+    "p_adjust_no_self"
+  } else {
+    "p_adjust"
+  }
+  if (!is.null(max_p) && p_col %in% names(df)) keep <- keep & df[[p_col]] <= max_p
+  if (!is.null(max_p_adjust) && p_adjust_col %in% names(df)) keep <- keep & df[[p_adjust_col]] <= max_p_adjust
   if (!is.null(direct_overlap) && "direct_overlap" %in% names(df)) {
     keep <- keep & df$direct_overlap %in% direct_overlap
   }
@@ -772,10 +800,15 @@ print.tcm_ppi_set_eval <- function(x, ...) {
                                           source_col = "source",
                                           deg_score = FALSE,
                                           deg_score_method = "effect_significance",
-                                          require_score = TRUE) {
+                                          require_score = TRUE,
+                                          score_normalization = "auto") {
   if (is.null(x)) {
-    return(data.frame(symbol = character(), source = character(), score_raw = numeric(),
-                      score_norm = numeric(), has_score = logical(), stringsAsFactors = FALSE))
+    out <- data.frame(symbol = character(), source = character(), score_raw = numeric(),
+                      score_norm = numeric(), has_score = logical(), stringsAsFactors = FALSE)
+    attr(out, "score_normalization") <- list(
+      method = NA_character_, raw_range = c(NA_real_, NA_real_)
+    )
+    return(out)
   }
 
   if (is.character(x) && !is.data.frame(x)) {
@@ -787,14 +820,18 @@ print.tcm_ppi_set_eval <- function(x, ...) {
         call. = FALSE
       )
     }
-    return(data.frame(
+    out <- data.frame(
       symbol = x,
       source = source_name,
       score_raw = 1,
       score_norm = 1,
       has_score = FALSE,
       stringsAsFactors = FALSE
-    ))
+    )
+    attr(out, "score_normalization") <- list(
+      method = "binary", raw_range = c(1, 1)
+    )
+    return(out)
   }
 
   if (!is.data.frame(x)) {
@@ -846,9 +883,20 @@ print.tcm_ppi_set_eval <- function(x, ...) {
   }
 
   score[!is.finite(score)] <- NA_real_
-  score_norm <- .tw_score_norm(score, has_score = has_score)
+  score_norm <- .tw_score_norm(
+    score,
+    has_score = has_score,
+    method = score_normalization
+  )
+  applied_method <- attr(score_norm, "normalization_method")
+  finite_score <- score[is.finite(score)]
+  raw_range <- if (length(finite_score) > 0L) {
+    range(finite_score)
+  } else {
+    c(NA_real_, NA_real_)
+  }
 
-  data.frame(
+  out <- data.frame(
     symbol = x[[gcol]],
     source = src,
     score_raw = score,
@@ -856,6 +904,11 @@ print.tcm_ppi_set_eval <- function(x, ...) {
     has_score = has_score,
     stringsAsFactors = FALSE
   )
+  attr(out, "score_normalization") <- list(
+    method = applied_method,
+    raw_range = unname(raw_range)
+  )
+  out
 }
 
 .tw_load_default_ppi <- function(ppi_path = NULL) {
@@ -903,16 +956,26 @@ print.tcm_ppi_set_eval <- function(x, ...) {
   if (length(hit) == 0L) NA_character_ else hit[[1]]
 }
 
-.tw_score_norm <- function(score, has_score) {
-  if (!has_score) return(rep(1, length(score)))
+.tw_score_norm <- function(score, has_score, method = c("auto", "none", "minmax")) {
+  method <- match.arg(method)
+  if (!has_score) {
+    out <- rep(1, length(score))
+    attr(out, "normalization_method") <- "binary"
+    return(out)
+  }
   finite <- is.finite(score)
   out <- rep(NA_real_, length(score))
   if (!any(finite)) {
     out[] <- 1
+    attr(out, "normalization_method") <- method
     return(out)
   }
   s <- score[finite]
-  if (all(s >= 0 & s <= 1, na.rm = TRUE)) {
+  applied_method <- method
+  if (method == "auto") {
+    applied_method <- if (all(s >= 0 & s <= 1, na.rm = TRUE)) "none" else "minmax"
+  }
+  if (applied_method == "none") {
     out[finite] <- s
   } else {
     rng <- range(s, na.rm = TRUE)
@@ -923,7 +986,9 @@ print.tcm_ppi_set_eval <- function(x, ...) {
     }
   }
   out[is.na(out)] <- 0
-  pmin(1, pmax(0, out))
+  if (applied_method == "minmax") out <- pmin(1, pmax(0, out))
+  attr(out, "normalization_method") <- applied_method
+  out
 }
 
 .tw_source_weight <- function(source, source_weights) {
@@ -961,7 +1026,13 @@ print.tcm_ppi_set_eval <- function(x, ...) {
 
 .tw_as_disease_weights <- function(disease_targets, disease_gene_col = "symbol", disease_weight_col = "disease_weight") {
   if (is.character(disease_targets) && !is.data.frame(disease_targets)) {
-    return(prepare_disease_weights(user = disease_targets))
+    warning(
+      "Character disease targets are treated as binary disease-target evidence without target-level scores.",
+      call. = FALSE
+    )
+    out <- prepare_disease_weights(user = disease_targets, require_score = FALSE)
+    out$source_detail <- paste0(out$source_detail, ";binary_unscored")
+    return(out)
   }
   if (!is.data.frame(disease_targets)) {
     stop("disease_targets must be a data frame or character vector.", call. = FALSE)

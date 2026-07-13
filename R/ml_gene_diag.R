@@ -77,7 +77,14 @@
     lvls <- levels(group)
   }
 
-  res <- list(expr = expr_df, group = grp, levels = lvls, name_map = name_map)
+  evaluation_set <- if (!is.null(ml_data)) use else "provided"
+  res <- list(
+    expr = expr_df,
+    group = grp,
+    levels = lvls,
+    name_map = name_map,
+    evaluation_set = evaluation_set
+  )
   return(res)
 }
 
@@ -89,7 +96,7 @@
 #' For each gene the function treats its expression as a univariate predictor,
 #' computes a ROC curve via \pkg{pROC}, and returns a summary table with AUC,
 #' 95 \% DeLong confidence interval, optimal cutoff (Youden's J), sensitivity,
-#' specificity and a one-sided test against AUC = 0.5.
+#' specificity and a two-sided test against AUC = 0.5.
 #'
 #' @param genes Character vector of gene symbols to evaluate.
 #' @param ml_data A \code{tcm_ml_data} object from \code{\link{prepare_ml_data}}
@@ -110,6 +117,11 @@
 #'   FDR).  Other common choices: \code{"bonferroni"}, \code{"holm"},
 #'   \code{"none"}.  When only a single gene is supplied no correction is
 #'   needed and \code{p_adj} equals \code{p_value} regardless of method.
+#' @param ci_method Confidence-interval method: DeLong or stratified bootstrap.
+#' @param conf_level Confidence level. Default is 0.95.
+#' @param boot_n Number of bootstrap replicates when
+#'   \code{ci_method = "bootstrap"}.
+#' @param seed Random seed used for bootstrap confidence intervals.
 #'
 #' @return A \code{data.frame} sorted by descending AUC with columns:
 #'   \code{gene}, \code{auc}, \code{ci_lower}, \code{ci_upper},
@@ -131,10 +143,15 @@ get_gene_auc <- function(genes,
                          group = NULL,
                          use = c("auto", "train", "test"),
                          ci = TRUE,
-                         p_adjust_method = "BH") {
+                         p_adjust_method = "BH",
+                         ci_method = c("delong", "bootstrap"),
+                         conf_level = 0.95,
+                         boot_n = 2000L,
+                         seed = 2025L) {
 
   p_adjust_method <- match.arg(p_adjust_method,
                                choices = stats::p.adjust.methods)
+  ci_method <- match.arg(ci_method)
 
   if (!requireNamespace("pROC", quietly = TRUE))
     stop("Package 'pROC' is required. Install with install.packages('pROC').",
@@ -146,52 +163,106 @@ get_gene_auc <- function(genes,
   grp <- dat$group
   lvls <- dat$levels
   name_map <- dat$name_map
+  evaluation_set <- dat$evaluation_set
+  if (identical(evaluation_set, "train")) {
+    message(
+      "Single-gene AUCs are being estimated on training data and are descriptive, not external validation."
+    )
+  }
+
+  empty_row <- function(gene, status, n_positive = 0L, n_negative = 0L) {
+    data.frame(
+      gene = gene,
+      auc = NA_real_,
+      ci_lower = NA_real_,
+      ci_upper = NA_real_,
+      direction = NA_character_,
+      optimal_cutoff = NA_real_,
+      sensitivity = NA_real_,
+      specificity = NA_real_,
+      youden_J = NA_real_,
+      p_value = NA_real_,
+      n_positive = as.integer(n_positive),
+      n_negative = as.integer(n_negative),
+      ci_method = ci_method,
+      conf_level = conf_level,
+      evaluation_set = evaluation_set,
+      status = status,
+      stringsAsFactors = FALSE
+    )
+  }
 
   rows <- lapply(colnames(expr_df), function(col) {
-    x <- expr_df[[col]]
-    roc_obj <- pROC::roc(response = grp, predictor = x,
-                         levels = lvls, quiet = TRUE)
-    auc_val <- as.numeric(pROC::auc(roc_obj))
+    x <- suppressWarnings(as.numeric(expr_df[[col]]))
+    complete <- is.finite(x) & !is.na(grp)
+    x_complete <- x[complete]
+    grp_complete <- factor(grp[complete], levels = lvls)
+    counts <- table(grp_complete)
+    n_positive <- unname(as.integer(counts[[lvls[[1]]]]))
+    n_negative <- unname(as.integer(counts[[lvls[[2]]]]))
+    gene <- name_map[[col]]
 
-    ci_lo <- ci_hi <- NA_real_
-    if (isTRUE(ci)) {
-      ci_obj <- pROC::ci.auc(roc_obj, method = "delong")
-      ci_lo  <- ci_obj[1L]
-      ci_hi  <- ci_obj[3L]
+    if (length(x_complete) == 0L || length(unique(x_complete)) < 2L) {
+      return(empty_row(
+        gene,
+        "constant_or_missing",
+        n_positive = n_positive,
+        n_negative = n_negative
+      ))
+    }
+    if (n_positive < 2L || n_negative < 2L) {
+      return(empty_row(
+        gene,
+        "insufficient_class_size",
+        n_positive = n_positive,
+        n_negative = n_negative
+      ))
     }
 
-    ## Optimal cutoff by Youden's J
-    best <- pROC::coords(roc_obj, x = "best", best.method = "youden",
-                         ret = c("threshold", "sensitivity", "specificity"),
-                         transpose = FALSE)
-    ## coords may return multiple rows — pick first
-    if (nrow(best) > 1L) best <- best[1L, , drop = FALSE]
+    roc_metrics <- .compute_roc_metrics(
+      truth = grp_complete,
+      probability = x_complete,
+      positive_class = lvls[[1]],
+      ci_method = ci_method,
+      conf_level = conf_level,
+      boot_n = boot_n,
+      seed = seed
+    )
 
-    ## Test: AUC != 0.5 (two-sided, via DeLong SE from CI)
+    ci_lo <- if (isTRUE(ci)) roc_metrics$ci_lower else NA_real_
+    ci_hi <- if (isTRUE(ci)) roc_metrics$ci_upper else NA_real_
     p_val <- tryCatch({
-      ci_obj_p <- if (isTRUE(ci)) ci_obj else pROC::ci.auc(roc_obj, method = "delong")
-      se_auc <- (ci_obj_p[3L] - ci_obj_p[1L]) / (2 * stats::qnorm(0.975))
-      z <- (auc_val - 0.5) / se_auc
-      2 * stats::pnorm(-abs(z))
+      z_critical <- stats::qnorm((1 + conf_level) / 2)
+      se_auc <- (roc_metrics$ci_upper - roc_metrics$ci_lower) /
+        (2 * z_critical)
+      if (!is.finite(se_auc) || se_auc <= 0) NA_real_ else {
+        2 * stats::pnorm(-abs((roc_metrics$auc - 0.5) / se_auc))
+      }
     }, error = function(e) NA_real_)
 
     data.frame(
-      gene = name_map[[col]],
-      auc = auc_val,
+      gene = gene,
+      auc = roc_metrics$auc,
       ci_lower = ci_lo,
       ci_upper = ci_hi,
-      direction = roc_obj$direction,
-      optimal_cutoff = best$threshold,
-      sensitivity = best$sensitivity,
-      specificity = best$specificity,
-      youden_J = best$sensitivity + best$specificity - 1,
+      direction = roc_metrics$direction,
+      optimal_cutoff = roc_metrics$threshold,
+      sensitivity = roc_metrics$sensitivity,
+      specificity = roc_metrics$specificity,
+      youden_J = roc_metrics$sensitivity + roc_metrics$specificity - 1,
       p_value = p_val,
+      n_positive = roc_metrics$n_positive,
+      n_negative = roc_metrics$n_negative,
+      ci_method = ci_method,
+      conf_level = conf_level,
+      evaluation_set = evaluation_set,
+      status = "ok",
       stringsAsFactors = FALSE
     )
   })
 
   out <- do.call(rbind, rows)
-  out <- out[order(-out$auc), ]
+  out <- out[order(is.na(out$auc), -out$auc, out$gene), ]
   out$p_adj <- stats::p.adjust(out$p_value, method = p_adjust_method)
   rownames(out) <- NULL
   return(out)

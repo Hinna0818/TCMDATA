@@ -24,6 +24,9 @@
 #' @param cv_folds Number of CV folds. Default 10.
 #' @param seed Random seed. Default 2025.
 #' @param ... Passed to [glmnet::cv.glmnet()].
+#' @param balance_method Class-balancing strategy. The default
+#'   \code{"none"} preserves the original workflow; \code{"auto"} uses
+#'   inverse-frequency weights only when imbalance is detected.
 #'
 #' @return A \code{tcm_ml} object.
 #' @importFrom stats coef predict
@@ -40,7 +43,8 @@ ml_enet <- function(ml_data,
                     type_measure = "auc",
                     cv_folds = 10,
                     seed = 2025,
-                    ...) {
+                    ...,
+                    balance_method = c("none", "auto", "weights", "down")) {
 
   .check_ml_deps("glmnet")
   stopifnot(inherits(ml_data, "tcm_ml_data"))
@@ -49,8 +53,11 @@ ml_enet <- function(ml_data,
 
   method_name <- if (alpha == 1) "lasso" else if (alpha == 0) "ridge" else "enet"
 
-  x <- as.matrix(ml_data$train_x)
-  y <- ml_data$train_y
+  balance <- .prepare_model_balance(
+    ml_data, balance_method, model = "glmnet", seed = seed
+  )
+  x <- as.matrix(balance$x)
+  y <- balance$y
 
   ## Relevel so that glmnet treats levels[1] (our positive class) as
 
@@ -62,10 +69,39 @@ ml_enet <- function(ml_data,
   set.seed(seed)
   message(sprintf("Running %s (cv.glmnet, alpha = %g) ...",
                   toupper(method_name), alpha))
-  cvfit <- glmnet::cv.glmnet(x = x, y = y_glm, family = "binomial",
-                              alpha = alpha, nfolds = cv_folds,
-                              type.measure = type_measure,
-                              keep = TRUE, ...)
+  dots <- list(...)
+  cv_folds_used <- as.integer(cv_folds)
+  cv_args <- c(list(
+    x = x,
+    y = y_glm,
+    family = "binomial",
+    alpha = alpha,
+    nfolds = cv_folds_used,
+    type.measure = type_measure,
+    keep = TRUE
+  ), dots)
+  if (balance$info$applied %in% c("weights", "down")) {
+    conflicts <- intersect(c("weights", "foldid"), names(dots))
+    if (length(conflicts) > 0L) {
+      stop(
+        "Do not pass ", paste(conflicts, collapse = "/"),
+        " through ... when balance_method controls resampling.",
+        call. = FALSE
+      )
+    }
+    cv_folds_used <- min(cv_folds_used, min(table(y)))
+    if (cv_folds_used < 3L) {
+      stop("Balanced glmnet CV requires at least three samples per class.",
+           call. = FALSE)
+    }
+    cv_args$nfolds <- cv_folds_used
+    cv_args$foldid <- .stratified_foldid(y, cv_folds_used, seed = seed)
+    if (identical(balance$info$applied, "weights")) {
+      cv_args$weights <- balance$case_weights
+    }
+    balance$info$cv_folds <- cv_folds_used
+  }
+  cvfit <- do.call(glmnet::cv.glmnet, cv_args)
 
   lambda_sel <- if (lambda_rule == "1se") cvfit$lambda.1se else cvfit$lambda.min
 
@@ -111,21 +147,28 @@ ml_enet <- function(ml_data,
   cv_perf <- list(auc = cvfit$cvm[idx_lam], auc_sd = cvfit$cvsd[idx_lam],
                   sensitivity = tp / (tp + fn), specificity = tn / (tn + fp),
                   lambda = lambda_sel, lambda_rule = lambda_rule,
-                  alpha = alpha, nfolds = cv_folds)
+                  alpha = alpha, nfolds = cv_folds_used)
 
   test_perf <- NULL
   if (!isTRUE(ml_data$full_cv) && !is.null(ml_data$test_x)) {
     .check_ml_deps("caret")
-    ctrl <- .make_train_ctrl(method = "cv", number = cv_folds,
+    ctrl <- .make_train_ctrl(method = "cv", number = cv_folds_used,
                              repeats = 1, seed = seed)
     set.seed(seed)
-    fit_caret <- caret::train(
-      x = ml_data$train_x, y = ml_data$train_y,
-      method = "glmnet", trControl = ctrl,
+    caret_args <- list(
+      x = as.data.frame(x),
+      y = y,
+      method = "glmnet",
+      trControl = ctrl,
       tuneGrid = data.frame(alpha = alpha, lambda = lambda_sel),
-      metric = "ROC", preProcess = c("center", "scale"),
+      metric = "ROC",
+      preProcess = c("center", "scale"),
       family = "binomial"
     )
+    if (identical(balance$info$applied, "weights")) {
+      caret_args$weights <- balance$case_weights
+    }
+    fit_caret <- do.call(caret::train, caret_args)
     test_perf <- .eval_test(fit_caret, ml_data$test_x,
                             ml_data$test_y, ml_data$levels[1])
   }
@@ -142,6 +185,7 @@ ml_enet <- function(ml_data,
   ## Store OOF probability as P(levels[1]) for ROC plotting
   ## (already P(levels[1]) after releveling — no inversion needed)
   obj$oof_prob <- oof_prob
+  obj$balance_info <- balance$info
 
   sel_msg <- if (alpha == 0)
     sprintf("Top %d / %d (by |coef|)", length(selected), ncol(x))
@@ -168,9 +212,11 @@ ml_lasso <- function(ml_data,
                      lambda_rule = c("1se", "min"),
                      cv_folds = 10,
                      seed = 2025,
-                     ...) {
+                     ...,
+                     balance_method = c("none", "auto", "weights", "down")) {
   return(ml_enet(ml_data, alpha = 1, lambda_rule = lambda_rule,
-                 cv_folds = cv_folds, seed = seed, ...))
+                 cv_folds = cv_folds, seed = seed, ...,
+                 balance_method = balance_method))
 }
 
 
@@ -191,9 +237,11 @@ ml_ridge <- function(ml_data,
                      top_n = NULL,
                      cv_folds = 10,
                      seed = 2025,
-                     ...) {
+                     ...,
+                     balance_method = c("none", "auto", "weights", "down")) {
   return(ml_enet(ml_data, alpha = 0, lambda_rule = lambda_rule,
-                 top_n = top_n, cv_folds = cv_folds, seed = seed, ...))
+                 top_n = top_n, cv_folds = cv_folds, seed = seed, ...,
+                 balance_method = balance_method))
 }
 
 
@@ -271,6 +319,9 @@ get_enet_coefs <- function(ml_obj,
 #' @param refit_on_selected Logical. Re-fit a RF on selected genes only so that OOB / test metrics reflect the actual feature subset. Default \code{TRUE} (recommended).
 #' @param seed Random seed. Default \code{2025}.
 #' @param ... Additional arguments forwarded to \code{\link[randomForest]{randomForest}}.
+#' @param balance_method Class-balancing strategy. \code{"weights"} passes
+#'   training-derived class weights to Random Forest and Boruta;
+#'   \code{"down"} downsamples training data only.
 #' @return A \code{tcm_ml} object after feature selection.
 #' @importFrom stats predict
 #' @examples
@@ -286,7 +337,8 @@ ml_rf <- function(ml_data,
                   max_runs = 100,
                   refit_on_selected = TRUE,
                   seed = 2025,
-                  ...) {
+                  ...,
+                  balance_method = c("none", "auto", "weights", "down")) {
 
   ## Dependencies & input validation
   .check_ml_deps(c("randomForest", "Boruta"))
@@ -313,13 +365,33 @@ ml_rf <- function(ml_data,
 
   pos <- ml_data$levels[1]
   neg <- ml_data$levels[2]
+  balance <- .prepare_model_balance(
+    ml_data, balance_method, model = "rf", seed = seed
+  )
+  train_x <- balance$x
+  train_y <- balance$y
+  rf_dots <- list(...)
+  if (identical(balance$info$applied, "weights") &&
+      "classwt" %in% names(rf_dots)) {
+    stop(
+      "Do not pass classwt through ... when balance_method uses weights.",
+      call. = FALSE
+    )
+  }
+  rf_args <- c(list(
+    x = train_x,
+    y = train_y,
+    ntree = n_trees,
+    importance = TRUE
+  ), rf_dots)
+  if (identical(balance$info$applied, "weights")) {
+    rf_args$classwt <- balance$class_weights
+  }
 
   ## Full-feature Random Forest (importance source)
   set.seed(seed)
   message("Phase 1: Training Random Forest on all features ...")
-  rf_full <- randomForest::randomForest(
-    x = ml_data$train_x, y = ml_data$train_y,
-    ntree = n_trees, importance = TRUE, ...)
+  rf_full <- do.call(randomForest::randomForest, rf_args)
 
   imp_raw <- randomForest::importance(rf_full)
   imp_df <- data.frame(
@@ -331,14 +403,22 @@ ml_rf <- function(ml_data,
   rownames(imp_df) <- imp_df$gene
 
   ## OOB performance of full model (always recorded)
-  oob_full <- .compute_oob(rf_full, ml_data$train_y, pos, neg, n_trees = n_trees)
+  oob_full <- .compute_oob(rf_full, train_y, pos, neg, n_trees = n_trees)
 
   ## Boruta feature selection
   set.seed(seed)
   message("Phase 2: Running Boruta feature selection ...")
-  boruta_res <- Boruta::Boruta(
-    x = ml_data$train_x, y = ml_data$train_y,
-    maxRuns = max_runs, ntree = n_trees, doTrace = 0)
+  boruta_args <- list(
+    x = train_x,
+    y = train_y,
+    maxRuns = max_runs,
+    ntree = n_trees,
+    doTrace = 0
+  )
+  if (identical(balance$info$applied, "weights")) {
+    boruta_args$classwt <- balance$class_weights
+  }
+  boruta_res <- do.call(Boruta::Boruta, boruta_args)
   boruta_res <- Boruta::TentativeRoughFix(boruta_res)
 
   confirmed <- names(
@@ -367,10 +447,17 @@ ml_rf <- function(ml_data,
     set.seed(seed)
     message(sprintf("Phase 3: Re-fitting RF on %d selected features ...",
                     length(selected)))
-    train_sel <- ml_data$train_x[, selected, drop = FALSE]
-    rf_refit <- randomForest::randomForest(
-      x = train_sel, y = ml_data$train_y,
-      ntree = n_trees, importance = TRUE)
+    train_sel <- train_x[, selected, drop = FALSE]
+    refit_args <- list(
+      x = train_sel,
+      y = train_y,
+      ntree = n_trees,
+      importance = TRUE
+    )
+    if (identical(balance$info$applied, "weights")) {
+      refit_args$classwt <- balance$class_weights
+    }
+    rf_refit <- do.call(randomForest::randomForest, refit_args)
     imp_raw_r <- randomForest::importance(rf_refit)
     imp_refit <- data.frame(
       gene = rownames(imp_raw_r),
@@ -385,7 +472,7 @@ ml_rf <- function(ml_data,
   rf_active <- if (!is.null(rf_refit)) rf_refit else rf_full
 
   ## OOB performance from active model
-  oob_active <- .compute_oob(rf_active, ml_data$train_y, pos, neg,
+  oob_active <- .compute_oob(rf_active, train_y, pos, neg,
                              n_trees = n_trees)
   ## Stored as cv_performance for S3 compatibility
   cv_perf <- oob_active
@@ -401,19 +488,23 @@ ml_rf <- function(ml_data,
     pred_class <- stats::predict(rf_active, newdata = test_x_sel)
     pred_prob  <- stats::predict(rf_active, newdata = test_x_sel, type = "prob")
     cm <- caret::confusionMatrix(pred_class, ml_data$test_y, positive = pos)
-    auc_val <- NA_real_
+    roc_metrics <- NULL
     if (requireNamespace("pROC", quietly = TRUE) && pos %in% colnames(pred_prob)) {
-      roc_obj <- pROC::roc(response = ml_data$test_y,
-                           predictor = pred_prob[, pos],
-                           levels = ml_data$levels, quiet = TRUE)
-      auc_val <- as.numeric(pROC::auc(roc_obj))
+      roc_metrics <- .compute_roc_metrics(
+        ml_data$test_y,
+        pred_prob[, pos],
+        positive_class = pos
+      )
     }
     test_perf <- list(
       predictions = pred_class,
       probabilities = as.data.frame(pred_prob),
       confusion = cm,
       accuracy = as.numeric(cm$overall["Accuracy"]),
-      auc = auc_val,
+      auc = if (is.null(roc_metrics)) NA_real_ else roc_metrics$auc,
+      ci_lower = if (is.null(roc_metrics)) NA_real_ else roc_metrics$ci_lower,
+      ci_upper = if (is.null(roc_metrics)) NA_real_ else roc_metrics$ci_upper,
+      ci_method = if (is.null(roc_metrics)) NA_character_ else roc_metrics$ci_method,
       sensitivity = as.numeric(cm$byClass["Sensitivity"]),
       specificity = as.numeric(cm$byClass["Specificity"]))
   }
@@ -436,6 +527,7 @@ ml_rf <- function(ml_data,
   obj$oob_full <- oob_full
   obj$importance_refit <- imp_refit
   obj$genes <- selected
+  obj$balance_info <- balance$info
 
   ## Summary message
   n_conf <- sum(boruta_res$finalDecision == "Confirmed")
@@ -506,6 +598,10 @@ ml_rf <- function(ml_data,
 #' @param cv_repeats Outer CV repeats. Default 5.
 #' @param seed Random seed. Default 2025.
 #' @param ... Passed to [caret::rfe()].
+#' @param balance_method Class-balancing strategy. SVM-RFE supports
+#'   \code{"none"}, \code{"auto"}, and fold-internal \code{"down"}; explicit
+#'   \code{"weights"} is rejected because the underlying SVM path does not use
+#'   those weights reliably.
 #'
 #' @return A \code{tcm_ml} object with \code{$rfe_result}, \code{$profile}, \code{$genes}.
 #' @importFrom stats aggregate
@@ -524,7 +620,8 @@ ml_svm_rfe <- function(ml_data,
                        cv_folds = 5,
                        cv_repeats = 5,
                        seed = 2025,
-                       ...) {
+                       ...,
+                       balance_method = c("none", "auto", "weights", "down")) {
 
   .check_ml_deps(c("caret", "kernlab"))
   stopifnot(inherits(ml_data, "tcm_ml_data"))
@@ -532,9 +629,15 @@ ml_svm_rfe <- function(ml_data,
     stop(sprintf("ml_svm_rfe() requires exactly 2 classes, got %d.",
                  nlevels(ml_data$train_y)), call. = FALSE)
   kernel <- match.arg(kernel)
+  balance <- .prepare_model_balance(
+    ml_data, balance_method, model = "svm_rfe", seed = seed
+  )
+  train_x <- balance$x
+  train_y <- balance$y
+  sampling <- if (identical(balance$info$applied, "down")) "down" else NULL
 
-  p <- ncol(ml_data$train_x)
-  n <- nrow(ml_data$train_x)
+  p <- ncol(train_x)
+  n <- nrow(train_x)
   if (p > n)
     warning(sprintf(
       "p (%d) > n (%d): SVM-RFE may be unstable; consider pre-filtering candidate genes.",
@@ -574,18 +677,22 @@ ml_svm_rfe <- function(ml_data,
 
   message(sprintf("Running SVM-RFE (%s) ...", kernel))
   set.seed(seed)
+  inner_ctrl_args <- list(
+    method = "cv",
+    number = cv_folds,
+    classProbs = use_class_probs,
+    summaryFunction = summary_func
+  )
+  if (!is.null(sampling)) inner_ctrl_args$sampling <- sampling
   rfe_res <- caret::rfe(
-    x = ml_data$train_x, y = ml_data$train_y,
+    x = train_x, y = train_y,
     sizes = sizes, rfeControl = rfe_ctrl,
     method = kernel, metric = metric,
     preProcess = c("center", "scale"),
     ## Inner CV: single-fold CV for SVM hyperparameter tuning within each RFE fold.
     ## Intentionally plain trainControl (not .make_train_ctrl): outer rfeControl
     ## already handles repeatedcv, so inner CV only needs one pass.
-    trControl = caret::trainControl(
-      method = "cv", number = cv_folds,
-      classProbs = use_class_probs, summaryFunction = summary_func
-    ), ...
+    trControl = do.call(caret::trainControl, inner_ctrl_args), ...
   )
 
   ## aggregate importance (used for ranking & gene selection)
@@ -641,12 +748,13 @@ ml_svm_rfe <- function(ml_data,
       number = cv_folds,
       repeats = cv_repeats,
       seed = seed,
-      class_probs = use_class_probs
+      class_probs = use_class_probs,
+      sampling = sampling
     )
     set.seed(seed)
     fit_final <- caret::train(
-      x = ml_data$train_x[, selected, drop = FALSE],
-      y = ml_data$train_y, method = kernel,
+      x = train_x[, selected, drop = FALSE],
+      y = train_y, method = kernel,
       trControl = ctrl, metric = metric,
       preProcess = c("center", "scale")
     )
@@ -662,6 +770,7 @@ ml_svm_rfe <- function(ml_data,
   obj$rfe_result <- rfe_res
   obj$profile <- rfe_res$results
   obj$genes <- selected
+  obj$balance_info <- balance$info
 
   ## Extract OOF probabilities from saved CV predictions
   ## rfe_res$pred contains per-fold predictions at each subset size;
@@ -706,6 +815,9 @@ ml_svm_rfe <- function(ml_data,
 #' @param early_stopping_rounds Stop if no improvement for this many rounds. Default 20.
 #' @param seed Random seed. Default 2025.
 #' @param ... Passed to [xgboost::xgb.cv()] and [xgboost::xgb.train()].
+#' @param balance_method Class-balancing strategy. \code{"weights"} derives
+#'   \code{scale_pos_weight} from training data; \code{"down"} downsamples
+#'   training data only.
 #'
 #' @return A \code{tcm_ml} object with \code{$xgb_fit}, \code{$cv_log}, \code{$genes}.
 #' @importFrom stats predict
@@ -724,7 +836,8 @@ ml_xgboost <- function(ml_data,
                        cv_folds = 5,
                        early_stopping_rounds = 20,
                        seed = 2025,
-                       ...) {
+                       ...,
+                       balance_method = c("none", "auto", "weights", "down")) {
 
   .check_ml_deps("xgboost")
   stopifnot(inherits(ml_data, "tcm_ml_data"))
@@ -733,23 +846,37 @@ ml_xgboost <- function(ml_data,
          call. = FALSE)
   }
 
-  x_mat <- as.matrix(ml_data$train_x)
-  y_num <- as.integer(ml_data$train_y == ml_data$levels[1])
+  balance <- .prepare_model_balance(
+    ml_data, balance_method, model = "xgboost", seed = seed
+  )
+  x_mat <- as.matrix(balance$x)
+  train_y <- balance$y
+  y_num <- as.integer(train_y == ml_data$levels[1])
 
   dtrain <- xgboost::xgb.DMatrix(data = x_mat, label = y_num)
 
-  params <- list(
+  dots <- list(...)
+  if (identical(balance$info$applied, "weights") &&
+      "scale_pos_weight" %in% names(dots)) {
+    stop(
+      "Do not pass scale_pos_weight through ... when balance_method uses weights.",
+      call. = FALSE
+    )
+  }
+  params <- c(list(
     objective = "binary:logistic",
     eval_metric = eval_metric,
     max_depth = max_depth,
-    eta = eta,
-    ...
-  )
+    eta = eta
+  ), dots)
+  if (identical(balance$info$applied, "weights")) {
+    params$scale_pos_weight <- balance$scale_pos_weight
+  }
 
   ## CV for optimal nrounds
   set.seed(seed)
   message("Running XGBoost CV ...")
-  cv_res <- xgboost::xgb.cv(
+  cv_args <- list(
     params = params,
     data = dtrain,
     nrounds = nrounds,
@@ -758,6 +885,18 @@ ml_xgboost <- function(ml_data,
     prediction = TRUE,
     verbose = 0
   )
+  if (!identical(balance$info$applied, "none")) {
+    cv_folds_used <- min(as.integer(cv_folds), min(table(train_y)))
+    if (cv_folds_used < 2L) {
+      stop("Balanced XGBoost CV requires at least two samples per class.",
+           call. = FALSE)
+    }
+    foldid <- .stratified_foldid(train_y, cv_folds_used, seed = seed)
+    cv_args$nfold <- NULL
+    cv_args$folds <- split(seq_along(train_y), foldid)
+    balance$info$cv_folds <- cv_folds_used
+  }
+  cv_res <- do.call(xgboost::xgb.cv, cv_args)
 
   ## xgboost >= 2.1: best_iteration moved into $early_stop sub-list
   best_iter <- if (!is.null(cv_res$best_iteration)) {
@@ -838,10 +977,10 @@ ml_xgboost <- function(ml_data,
   }
   pos <- ml_data$levels[1]; neg <- ml_data$levels[2]
   if (!is.null(oof_cls)) {
-    tp <- sum(oof_cls == pos & ml_data$train_y == pos)
-    fn <- sum(oof_cls == neg & ml_data$train_y == pos)
-    tn <- sum(oof_cls == neg & ml_data$train_y == neg)
-    fp <- sum(oof_cls == pos & ml_data$train_y == neg)
+    tp <- sum(oof_cls == pos & train_y == pos)
+    fn <- sum(oof_cls == neg & train_y == pos)
+    tn <- sum(oof_cls == neg & train_y == neg)
+    fp <- sum(oof_cls == pos & train_y == neg)
     cv_sens <- tp / (tp + fn)
     cv_spec <- tn / (tn + fp)
   } else {
@@ -865,12 +1004,13 @@ ml_xgboost <- function(ml_data,
                         levels = ml_data$levels)
     cm <- caret::confusionMatrix(pred_cls, ml_data$test_y,
                                  positive = ml_data$levels[1])
-    auc_val <- NA_real_
+    roc_metrics <- NULL
     if (requireNamespace("pROC", quietly = TRUE)) {
-      roc_obj <- pROC::roc(response = ml_data$test_y,
-                           predictor = pred_prob,
-                           levels = ml_data$levels, quiet = TRUE)
-      auc_val <- as.numeric(pROC::auc(roc_obj))
+      roc_metrics <- .compute_roc_metrics(
+        ml_data$test_y,
+        pred_prob,
+        positive_class = ml_data$levels[1]
+      )
     }
     test_perf <- list(predictions = pred_cls,
                       probabilities = stats::setNames(
@@ -879,7 +1019,10 @@ ml_xgboost <- function(ml_data,
                       ),
                       confusion = cm,
                       accuracy = as.numeric(cm$overall["Accuracy"]),
-                      auc = auc_val,
+                      auc = if (is.null(roc_metrics)) NA_real_ else roc_metrics$auc,
+                      ci_lower = if (is.null(roc_metrics)) NA_real_ else roc_metrics$ci_lower,
+                      ci_upper = if (is.null(roc_metrics)) NA_real_ else roc_metrics$ci_upper,
+                      ci_method = if (is.null(roc_metrics)) NA_character_ else roc_metrics$ci_method,
                       sensitivity = as.numeric(cm$byClass["Sensitivity"]),
                       specificity = as.numeric(cm$byClass["Specificity"]))
   }
@@ -893,6 +1036,8 @@ ml_xgboost <- function(ml_data,
   obj$genes <- selected
   ## Store OOF probability as P(levels[1]) for ROC plotting
   obj$oof_prob <- as.numeric(oof_prob)
+  obj$balance_info <- balance$info
+  obj$balance_info$scale_pos_weight <- balance$scale_pos_weight
 
   message(sprintf("  Top %d / %d features | CV %s = %s",
                   length(selected), ncol(x_mat), eval_metric,
@@ -913,6 +1058,8 @@ ml_xgboost <- function(ml_data,
 #' @param alpha Elastic Net alpha. Default 0.5 (ignored for lasso/ridge).
 #' @param top_n Top-n features for Ridge / XGBoost / SVM-RFE. Default \code{NULL} (keep all or auto-select).
 #' @param ... Forwarded to individual model functions.
+#' @param balance_method Class-balancing strategy forwarded to every requested
+#'   model. Default \code{"none"} preserves previous behavior.
 #'
 #' @return A named \code{tcm_ml_list}.
 #' @examples
@@ -929,7 +1076,8 @@ run_ml_screening <- function(ml_data,
                              cv_repeats = 5,
                              alpha = 0.5,
                              top_n = NULL,
-                             ...) {
+                             ...,
+                             balance_method = c("none", "auto", "weights", "down")) {
 
   stopifnot(inherits(ml_data, "tcm_ml_data"))
   methods <- match.arg(methods,
@@ -941,16 +1089,22 @@ run_ml_screening <- function(ml_data,
     m <- methods[i]
     message(sprintf("\n[%d/%d] %s", i, length(methods), toupper(m)))
     results[[m]] <- switch(m,
-      lasso = ml_lasso(ml_data, cv_folds = cv_folds, seed = seed, ...),
+      lasso = ml_lasso(ml_data, cv_folds = cv_folds, seed = seed, ...,
+                       balance_method = balance_method),
       enet = ml_enet(ml_data, alpha = alpha, cv_folds = cv_folds,
-                     seed = seed, ...),
+                     seed = seed, ...,
+                     balance_method = balance_method),
       ridge = ml_ridge(ml_data, top_n = top_n, cv_folds = cv_folds,
-                       seed = seed, ...),
-      rf = ml_rf(ml_data, seed = seed, ...),
+                       seed = seed, ...,
+                       balance_method = balance_method),
+      rf = ml_rf(ml_data, seed = seed, ...,
+                 balance_method = balance_method),
       svm_rfe = ml_svm_rfe(ml_data, top_n = top_n, cv_folds = cv_folds,
-                            cv_repeats = cv_repeats, seed = seed, ...),
+                            cv_repeats = cv_repeats, seed = seed, ...,
+                            balance_method = balance_method),
       xgboost = ml_xgboost(ml_data, top_n = top_n, cv_folds = cv_folds,
-                            seed = seed, ...)
+                            seed = seed, ...,
+                            balance_method = balance_method)
     )
   }
 

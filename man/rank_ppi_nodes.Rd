@@ -6,8 +6,8 @@
 \usage{
 rank_ppi_nodes(
   g,
-  metrics = c("degree", "betweenness", "closeness", "eccentricity", "radiality",
-    "Stress", "MCC", "MNC", "DMNC", "BN", "EPC"),
+  metrics = c("degree", "betweenness", "closeness", "eccentricity_centrality",
+    "radiality", "Stress", "MCC", "MNC", "DMNC", "BN", "EPC"),
   weights = NULL,
   use_weight = TRUE,
   na_rm = TRUE
@@ -16,9 +16,11 @@ rank_ppi_nodes(
 \arguments{
 \item{g}{An igraph object that has already been processed by \code{compute_nodeinfo()} or have added node metrics manually.}
 
-\item{metrics}{Character vector; which vertex attributes to use for scoring. Defaults are the same as Cytohubba.}
+\item{metrics}{Character vector; vertex attributes used for scoring.}
 
-\item{weights}{Numeric vector of the same length as metrics; relative weights for each metric. If NULL (default), all metrics are equally weighted.}
+\item{weights}{Numeric vector of the same length as metrics, or a named
+vector matched to resolved metric names. If NULL, metrics are equally
+weighted.}
 
 \item{use_weight}{Logical; whether use weighted metrics(beweenness and closeness) instead. Default is TRUE.}
 
@@ -27,7 +29,10 @@ rank_ppi_nodes(
 \value{
 A list with:
 \item{graph}{igraph object with added vertex attributes \code{Score_network} and \code{Rank_network}.}
-\item{table}{data.frame with node-level metrics and scores, sorted by \code{Rank_network}.}
+\item{table}{data.frame with node-level metrics, normalized scoring
+columns, and scores, sorted by \code{Rank_network}.}
+\item{scoring}{Resolved metric names, normalized weights, normalization
+method, and score direction.}
 }
 \description{
 Rank PPI nodes by integrated network centrality

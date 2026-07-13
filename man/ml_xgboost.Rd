@@ -17,7 +17,8 @@ ml_xgboost(
   cv_folds = 5,
   early_stopping_rounds = 20,
   seed = 2025,
-  ...
+  ...,
+  balance_method = c("none", "auto", "weights", "down")
 )
 }
 \arguments{
@@ -42,6 +43,10 @@ See \code{xgboost} documentation for full list.}
 \item{seed}{Random seed. Default 2025.}
 
 \item{...}{Passed to \code{\link[xgboost:xgb.cv]{xgboost::xgb.cv()}} and \code{\link[xgboost:xgb.train]{xgboost::xgb.train()}}.}
+
+\item{balance_method}{Class-balancing strategy. \code{"weights"} derives
+\code{scale_pos_weight} from training data; \code{"down"} downsamples
+training data only.}
 }
 \value{
 A \code{tcm_ml} object with \code{$xgb_fit}, \code{$cv_log}, \code{$genes}.

@@ -7,11 +7,13 @@
 ppi_knock(
   g,
   targets,
-  n_perm = 100L,
+  n_perm = 1000L,
   metrics = c("ASPL", "AD", "DC", "CC"),
   weight_attr = "score",
   rewire_niter = 10L,
-  seed = 42L
+  seed = 42L,
+  p_method = c("empirical", "normal"),
+  p_adjust_method = "BH"
 )
 }
 \arguments{
@@ -20,7 +22,7 @@ ppi_knock(
 \item{targets}{Character vector of node names to knock out (drug targets).}
 
 \item{n_perm}{Integer. Number of permutation iterations for the null
-distribution.  Default is \code{100}, matching the original paper.}
+distribution. Default is \code{1000}.}
 
 \item{metrics}{Character vector of whole-network metrics to track. Defaults
 to the original \code{ppi_knock()} metrics \code{"ASPL"}, \code{"AD"},
@@ -37,20 +39,29 @@ Default is \code{"score"}.}
 step (\code{ecount(g) * rewire_niter} swaps).  Default is \code{10}.}
 
 \item{seed}{Integer. Random seed for reproducibility. Default is \code{42}.}
+
+\item{p_method}{P-value family exposed through the compatibility field
+\code{Pvalue}. Defaults to permutation-based empirical P-values.}
+
+\item{p_adjust_method}{P-value adjustment method passed to
+\code{\link[stats]{p.adjust}}.}
 }
 \value{
-A list with three elements:
+A list containing metric-level statistics, integrated scores and
+P-values, and analysis parameters:
 \describe{
 \item{Summary}{A data.frame with one row per metric (\code{ASPL},
 \code{AD}, \code{DC}, \code{CC}) and columns \code{Baseline},
 \code{Post_KO}, \code{Raw_RI}, \code{Mu_Random}, \code{Sd_Random},
-\code{Normalized_RI} (Z-score), and \code{Pvalue}
-(two-sided, normal approximation).}
+\code{Normalized_RI} (Z-score), normal and empirical P-values, adjusted
+empirical P-values, and the selected compatibility field
+\code{Pvalue}.}
 \item{Total_Score}{Numeric. The integrated disruption score
 \eqn{Z_{ASPL} - Z_{AD} - Z_{DC} - Z_{CC}}.}
-\item{Total_Pvalue}{Numeric. Two-sided p-value for \code{Total_Score},
-derived by comparing the real combined RI against the permutation
-null distribution of combined RIs.}
+\item{Total_Pvalue}{Selected two-sided P-value for \code{Total_Score}.}
+\item{Total_P_normal, Total_P_empirical}{Normal-approximation and direct
+permutation P-values for the integrated statistic.}
+\item{params}{Permutation count, seed, metrics, and P-value method.}
 }
 }
 \description{
@@ -63,7 +74,7 @@ exactly following the methodology of Xi et al. (2022).
 \dontrun{
 data(demo_ppi)
 targets <- "IL6"
-res <- ppi_knock(demo_ppi, targets, n_perm = 100)
+res <- ppi_knock(demo_ppi, targets, n_perm = 1000)
 print(res$Summary)
 cat("Total Score:", res$Total_Score, "\n")
 cat("Total P-value:", res$Total_Pvalue, "\n")

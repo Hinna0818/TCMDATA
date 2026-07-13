@@ -13,7 +13,8 @@ ml_ridge(
   top_n = NULL,
   cv_folds = 10,
   seed = 2025,
-  ...
+  ...,
+  balance_method = c("none", "auto", "weights", "down")
 )
 }
 \arguments{
@@ -30,6 +31,10 @@ Ignored for LASSO / Elastic Net.}
 \item{seed}{Random seed. Default 2025.}
 
 \item{...}{Passed to \code{\link[glmnet:cv.glmnet]{glmnet::cv.glmnet()}}.}
+
+\item{balance_method}{Class-balancing strategy. The default
+\code{"none"} preserves the original workflow; \code{"auto"} uses
+inverse-frequency weights only when imbalance is detected.}
 }
 \value{
 A \code{tcm_ml} object (method = "ridge").

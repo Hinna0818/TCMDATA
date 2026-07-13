@@ -1,3 +1,25 @@
+# TCMDATA 1.0.0
+*Released: 2026-07-11*
+
+## Statistical robustness and ML validation
+
+- `ppi_knock()` and `ppi_knock_impact()` now default to 1,000 permutations,
+  report empirical and normal P-values separately, and apply BH correction to
+  the selected P-value family.
+- `rank_ppi_nodes()` now scores reciprocal eccentricity centrality, preserves
+  custom metrics, validates named weights, and returns normalized audit columns.
+- `calculate_metric_weights()` suggests correlation-adjusted weights by sharing
+  equal total weight across complete-linkage clusters of positively correlated
+  PPI metrics and reports pairwise observation counts for auditing.
+- `select_tcm_targets()` aligns default P-value filtering with the no-self PPI
+  proximity score while retaining a raw compatibility option.
+- ML data objects now report class balance. Existing model functions accept an
+  opt-in `balance_method` and retain `"none"` as the compatibility default.
+- `get_gene_auc()` now reports sample counts, evaluation set, status, and
+  configurable DeLong or bootstrap confidence intervals.
+- `evaluate_ml_nested_cv()` adds strict outer-fold OOF evaluation and feature
+  stability summaries for LASSO, RF, SVM-RFE, and XGBoost.
+
 # TCMDATA 0.1.0
 
 *Released: 2026-04-01*

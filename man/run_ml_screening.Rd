@@ -15,7 +15,8 @@ run_ml_screening(
   cv_repeats = 5,
   alpha = 0.5,
   top_n = NULL,
-  ...
+  ...,
+  balance_method = c("none", "auto", "weights", "down")
 )
 }
 \arguments{
@@ -34,6 +35,9 @@ run_ml_screening(
 \item{top_n}{Top-n features for Ridge / XGBoost / SVM-RFE. Default \code{NULL} (keep all or auto-select).}
 
 \item{...}{Forwarded to individual model functions.}
+
+\item{balance_method}{Class-balancing strategy forwarded to every requested
+model. Default \code{"none"} preserves previous behavior.}
 }
 \value{
 A named \code{tcm_ml_list}.

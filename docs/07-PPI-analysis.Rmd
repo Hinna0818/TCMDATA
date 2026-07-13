@@ -195,6 +195,7 @@ The following metrics are computed and stored as vertex attributes:
 | **Global** | `betweenness` | Fraction of all-pairs shortest paths passing through the node |
 | | `closeness` | Inverse of average shortest-path distance to all other nodes |
 | | `eccentricity` | Maximum shortest-path distance to any reachable node |
+| | `eccentricity_centrality` | Reciprocal eccentricity used for integrated ranking (larger = more central) |
 | | `eigen_centrality` | Influence score based on connections to high-scoring neighbors |
 | | `pagerank` | Importance based on random-walk visitation probability |
 | **CytoHubba**<sup>[1]</sup> | `MCC` | Maximal Clique Centrality — sum of (|C|−1)! over all maximal cliques containing the node |
@@ -207,7 +208,7 @@ The following metrics are computed and stored as vertex attributes:
 
 ### Integrated ranking
 
-`rank_ppi_nodes()` normalizes all selected metrics to [0, 1], applies user-defined weights (equal by default), and produces a composite score for target prioritization:
+`rank_ppi_nodes()` normalizes the selected metrics to [0, 1], applies user-defined weights (equal by default), and produces a composite score for target prioritization. Raw `eccentricity` is retained for reporting, while `eccentricity_centrality = 1 / eccentricity` is used in the default score so that larger values consistently indicate greater centrality. The returned `scoring` element records the resolved metrics and normalized weights, and the ranking table includes one `<metric>_norm` audit column for every scored metric.
 
 ```{r ppi-rank, eval=TRUE, collapse=FALSE}
 rank_res <- rank_ppi_nodes(ppi_scored, use_weight = TRUE)
@@ -218,6 +219,26 @@ rank_df <- rank_res$table
 
 rank_df[1:10, c("name", "degree", "betweenness_w", "closeness_w",
                 "MCC", "MNC", "EPC", "Score_network", "Rank_network")]
+```
+
+### Correlation-adjusted metric weights
+
+When several metrics are strongly positively correlated, `calculate_metric_weights()` groups them using complete-linkage clustering and gives each group equal total weight. The suggested weights reduce redundant contributions but do not estimate biological importance. The returned correlation matrix, paired-observation counts, and cluster assignments can be inspected before use. Pass the resolved metric names from `names(metric_weights$weights)` to `rank_ppi_nodes()`, as shown below.
+
+```{r ppi-metric-weights, eval=FALSE}
+metric_weights <- calculate_metric_weights(
+  ppi_scored,
+  metrics = c("degree", "betweenness", "closeness",
+              "eccentricity_centrality", "MCC", "MNC", "EPC"),
+  correlation_threshold = 0.8
+)
+
+rank_res <- rank_ppi_nodes(
+  ppi_scored,
+  metrics = names(metric_weights$weights),
+  weights = metric_weights$weights,
+  use_weight = FALSE
+)
 ```
 
 ### Radar plot of topological metrics
@@ -341,20 +362,26 @@ The algorithm tracks four network-level topological metrics — **ASPL** (Averag
 1. **Baseline**: Compute the four metrics on the intact network.
 2. **Real attack**: Remove the target nodes and re-compute metrics. The Robustness Index (RI) quantifies relative change: $RI = (M_{after} - M_{before}) / M_{before}$.
 3. **Permutation null**: Rewire the network $n$ times (preserving degree sequence), shuffle edge weights, randomly knock out the same number of nodes, and compute the random RI distribution.
-4. **Z-score normalization**: $Z = (RI_{real} - \mu_{null}) / \sigma_{null}$, with p-values derived via normal approximation: $p = 2\Phi(-|Z|)$.
+4. **Inference**: Compute $Z = (RI_{real} - \mu_{null}) / \sigma_{null}$ for effect-size standardization and a centered, two-sided empirical p-value directly from the permutation distribution. BH-adjusted empirical p-values are used by default; normal-approximation p-values remain available for compatibility.
 
-The **Total Score** integrates all metrics: $Total = Z_{ASPL} - Z_{AD} - Z_{DC} - Z_{CC}$. A large positive value indicates the knocked-out targets are structurally critical. The **Total P-value** is derived by comparing the real combined RI against the permutation null distribution of combined RIs.
+The **Total Score** integrates all metrics: $Total = Z_{ASPL} - Z_{AD} - Z_{DC} - Z_{CC}$. A large positive value indicates the knocked-out targets are structurally critical. Its empirical p-value is calculated from the combined statistic in each permutation rather than from a normal approximation to the final Z-score.
 
 ### Example: knocking out IL6
 
 ```{r ppi-knock, eval=TRUE, collapse=FALSE}
-res <- ppi_knock(ppi_scored, targets = "IL6", n_perm = 100)
+res <- ppi_knock(
+  ppi_scored,
+  targets = "IL6",
+  n_perm = 1000,
+  seed = 42,
+  p_method = "empirical"
+)
 res$Summary
 cat("Total Score:", res$Total_Score, "\n")
 cat("Total P-value:", res$Total_Pvalue, "\n")
 ```
 
-The results show that removing IL6 causes ASPL to increase (network paths become longer) while AD, DC, and CC decrease (connectivity drops), all deviating significantly from the random null (|Z| > 1.96, p < 0.05 for all metrics). The high Total Score (with a highly significant p-value) confirms IL6 as a structurally critical hub in this PPI network.
+Interpret `Normalized_RI` as the standardized topological change and use `P_empirical` / `P_adjust_empirical` for permutation inference. These statistics describe structural sensitivity of the supplied PPI network and should not be treated as experimental validation of a therapeutic target.
 
 ### Visualization: before vs. after knockout
 

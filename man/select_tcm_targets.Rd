@@ -12,7 +12,8 @@ select_tcm_targets(
   max_p = NULL,
   max_p_adjust = NULL,
   direct_overlap = NULL,
-  return = c("table", "targets")
+  return = c("table", "targets"),
+  p_variant = c("final", "no_self", "raw")
 )
 }
 \arguments{
@@ -34,6 +35,10 @@ limit is applied.}
 overlap.}
 
 \item{return}{Character. Return the selected table or only target symbols.}
+
+\item{p_variant}{P-value family used by \code{max_p} and
+\code{max_p_adjust}. The default \code{"final"} uses no-self proximity
+statistics when available; \code{"raw"} uses the original proximity.}
 }
 \value{
 A data frame or character vector.

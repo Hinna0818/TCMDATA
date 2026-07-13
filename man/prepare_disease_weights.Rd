@@ -14,7 +14,8 @@ prepare_disease_weights(
   deg_score = FALSE,
   deg_score_method = c("effect_significance", "wald_stat"),
   require_score = TRUE,
-  method = c("noisy_or", "weighted_mean", "max")
+  method = c("noisy_or", "weighted_mean", "max"),
+  score_normalization = c("auto", "none", "minmax")
 )
 }
 \arguments{
@@ -49,6 +50,10 @@ are rejected. Set to \code{FALSE} only for exploratory analyses where a
 source-level binary evidence fallback is intentional.}
 
 \item{method}{How to combine multiple evidence rows per gene.}
+
+\item{score_normalization}{Disease-score normalization: preserve scores,
+min-max normalize within each source, or \code{"auto"} to retain scores
+already between 0 and 1 and min-max normalize other ranges.}
 }
 \value{
 A data frame with one row per gene and columns \code{symbol},

@@ -17,8 +17,13 @@
 #' @param test_expr External validation matrix (genes x samples) for Mode C.
 #' @param test_group Labels for `test_expr` (required if `test_expr` given).
 #' @param seed Random seed. Default is 2025.
+#' @param imbalance_threshold Minority-class fraction below which the training
+#'   data are flagged as imbalanced. Default is 0.25.
+#' @param imbalance_action How to report detected imbalance: a warning, a
+#'   message, or no condition.
 #'
-#' @return A `tcm_ml_data` list: `train_x`, `train_y`, `test_x`, `test_y`, `gene_names`, `levels`, `full_cv`.
+#' @return A `tcm_ml_data` list containing the original train/test fields plus
+#'   training and optional test class-balance summaries.
 #' @importFrom stats var
 #' @examples
 #' \dontrun{
@@ -37,7 +42,11 @@ prepare_ml_data <- function(expr_mat,
                             train_idx = NULL,
                             test_expr = NULL,
                             test_group = NULL,
-                            seed = 2025) {
+                            seed = 2025,
+                            imbalance_threshold = 0.25,
+                            imbalance_action = c("warn", "message", "none")) {
+
+  imbalance_action <- match.arg(imbalance_action)
 
   if (isTRUE(split)) {
      .check_ml_deps("caret")
@@ -129,6 +138,30 @@ prepare_ml_data <- function(expr_mat,
                         nrow(dat), ncol(dat))
   }
 
+  out$class_balance <- .class_balance_summary(
+    out$train_y,
+    threshold = imbalance_threshold
+  )
+  out$test_class_balance <- if (!is.null(out$test_y)) {
+    .class_balance_summary(out$test_y, threshold = imbalance_threshold)
+  } else {
+    NULL
+  }
+  if (isTRUE(out$class_balance$is_imbalanced) && imbalance_action != "none") {
+    condition_message <- sprintf(
+      "Class imbalance detected in training data: %s (minority fraction %.3f < %.3f).",
+      paste(names(out$class_balance$counts), out$class_balance$counts,
+            sep = "=", collapse = ", "),
+      out$class_balance$minority_fraction,
+      imbalance_threshold
+    )
+    if (imbalance_action == "warn") {
+      warning(condition_message, call. = FALSE)
+    } else {
+      message(condition_message)
+    }
+  }
+
   class(out) <- "tcm_ml_data"
   message(mode_msg)
   return(out)
@@ -167,7 +200,8 @@ prepare_ml_data <- function(expr_mat,
                              repeats = 5,
                              seed = 2025,
                              class_probs = TRUE,
-                             summary_func = NULL) {
+                             summary_func = NULL,
+                             sampling = NULL) {
   if (is.null(summary_func)) {
     summary_func <- if (class_probs) caret::twoClassSummary else caret::defaultSummary
   }
@@ -184,6 +218,7 @@ prepare_ml_data <- function(expr_mat,
   if (method == "repeatedcv") {
     args$repeats <- repeats
   }
+  if (!is.null(sampling)) args$sampling <- sampling
   
   return(do.call(caret::trainControl, args))
 }
@@ -197,12 +232,13 @@ prepare_ml_data <- function(expr_mat,
   pred_prob <- stats::predict(model, newdata = test_x, type = "prob")
   cm <- caret::confusionMatrix(pred_class, test_y, positive = positive_class)
 
-  auc_val <- NA_real_
+  roc_metrics <- NULL
   if (requireNamespace("pROC", quietly = TRUE)) {
-    roc_obj <- pROC::roc(response = test_y,
-                         predictor = pred_prob[[positive_class]],
-                         levels = levels(test_y), quiet = TRUE)
-    auc_val <- as.numeric(pROC::auc(roc_obj))
+    roc_metrics <- .compute_roc_metrics(
+      truth = test_y,
+      probability = pred_prob[[positive_class]],
+      positive_class = positive_class
+    )
   }
 
   return(list(
@@ -210,10 +246,252 @@ prepare_ml_data <- function(expr_mat,
     probabilities = pred_prob,
     confusion = cm,
     accuracy = as.numeric(cm$overall["Accuracy"]),
-    auc = auc_val,
+    auc = if (is.null(roc_metrics)) NA_real_ else roc_metrics$auc,
+    ci_lower = if (is.null(roc_metrics)) NA_real_ else roc_metrics$ci_lower,
+    ci_upper = if (is.null(roc_metrics)) NA_real_ else roc_metrics$ci_upper,
+    ci_method = if (is.null(roc_metrics)) NA_character_ else roc_metrics$ci_method,
+    conf_level = if (is.null(roc_metrics)) NA_real_ else roc_metrics$conf_level,
+    roc = if (is.null(roc_metrics)) NULL else roc_metrics$roc_object,
     sensitivity = as.numeric(cm$byClass["Sensitivity"]),
     specificity = as.numeric(cm$byClass["Specificity"])
   ))
+}
+
+.class_balance_summary <- function(y, threshold = 0.25) {
+  if (!is.numeric(threshold) || length(threshold) != 1L ||
+      !is.finite(threshold) || threshold <= 0 || threshold > 0.5) {
+    stop("imbalance_threshold must be in (0, 0.5].", call. = FALSE)
+  }
+  y <- factor(y)
+  counts <- table(y)
+  counts <- stats::setNames(as.integer(counts), names(counts))
+  total <- sum(counts)
+  proportions <- if (total > 0L) counts / total else rep(NA_real_, length(counts))
+  minority_index <- which.min(counts)
+  majority_index <- which.max(counts)
+  minority_fraction <- if (total > 0L) counts[[minority_index]] / total else NA_real_
+  majority_count <- counts[[majority_index]]
+  imbalance_ratio <- if (majority_count > 0L) {
+    counts[[minority_index]] / majority_count
+  } else {
+    NA_real_
+  }
+  list(
+    counts = counts,
+    proportions = stats::setNames(as.numeric(proportions), names(counts)),
+    minority_class = names(counts)[[minority_index]],
+    majority_class = names(counts)[[majority_index]],
+    minority_fraction = unname(minority_fraction),
+    imbalance_ratio = unname(imbalance_ratio),
+    threshold = threshold,
+    is_imbalanced = is.finite(minority_fraction) && minority_fraction < threshold
+  )
+}
+
+.balanced_case_weights <- function(y) {
+  y <- factor(y)
+  counts <- table(y)
+  if (any(counts == 0L)) {
+    stop("Case weights require at least one sample in each class.", call. = FALSE)
+  }
+  raw <- length(y) / (length(counts) * counts)
+  weights <- unname(raw[as.character(y)])
+  weights / mean(weights)
+}
+
+.downsample_training_data <- function(x, y, seed = 2025L) {
+  y <- factor(y)
+  indices <- split(seq_along(y), y)
+  target_n <- min(lengths(indices))
+  if (target_n < 1L) {
+    stop("Downsampling requires at least one sample in each class.", call. = FALSE)
+  }
+  set.seed(seed)
+  selected <- unlist(lapply(indices, function(idx) sample(idx, target_n)),
+                     use.names = FALSE)
+  selected <- sort(selected)
+  list(
+    x = x[selected, , drop = FALSE],
+    y = factor(y[selected], levels = levels(y)),
+    index = selected,
+    counts_before = .class_balance_summary(y)$counts,
+    counts_after = .class_balance_summary(y[selected])$counts
+  )
+}
+
+.resolve_balance_method <- function(balance_method,
+                                    y,
+                                    model,
+                                    imbalance_threshold = 0.25) {
+  requested <- match.arg(
+    balance_method,
+    c("none", "auto", "weights", "down")
+  )
+  model <- match.arg(model, c("glmnet", "rf", "svm_rfe", "xgboost"))
+  if (requested == "weights" && model == "svm_rfe") {
+    stop(
+      "ml_svm_rfe() does not support balance_method = 'weights'; use 'down' or 'auto'.",
+      call. = FALSE
+    )
+  }
+  if (requested != "auto") return(requested)
+  summary <- .class_balance_summary(y, threshold = imbalance_threshold)
+  if (!summary$is_imbalanced) return("none")
+  if (model == "svm_rfe") "down" else "weights"
+}
+
+.prepare_model_balance <- function(ml_data,
+                                   balance_method,
+                                   model,
+                                   seed = 2025L) {
+  threshold <- if (!is.null(ml_data$class_balance$threshold)) {
+    ml_data$class_balance$threshold
+  } else {
+    0.25
+  }
+  requested <- match.arg(
+    balance_method,
+    c("none", "auto", "weights", "down")
+  )
+  applied <- .resolve_balance_method(
+    requested,
+    ml_data$train_y,
+    model = model,
+    imbalance_threshold = threshold
+  )
+  x <- ml_data$train_x
+  y <- ml_data$train_y
+  counts_before <- .class_balance_summary(y, threshold)$counts
+  case_weights <- NULL
+  class_weights <- NULL
+  scope <- "training_data"
+
+  if (applied == "down" && model != "svm_rfe") {
+    down <- .downsample_training_data(x, y, seed = seed)
+    x <- down$x
+    y <- down$y
+  } else if (applied == "weights") {
+    case_weights <- .balanced_case_weights(y)
+    class_weights <- tapply(case_weights, y, mean)
+  } else if (applied == "down" && model == "svm_rfe") {
+    scope <- "resample_training_folds"
+  }
+
+  counts_after <- if (applied == "down" && model == "svm_rfe") {
+    stats::setNames(rep(min(counts_before), length(counts_before)), names(counts_before))
+  } else {
+    .class_balance_summary(y, threshold)$counts
+  }
+  positive <- ml_data$levels[[1]]
+  negative <- ml_data$levels[[2]]
+  scale_pos_weight <- if (applied == "weights") {
+    unname(counts_before[[negative]] / counts_before[[positive]])
+  } else {
+    NULL
+  }
+
+  list(
+    x = x,
+    y = factor(y, levels = ml_data$levels),
+    case_weights = case_weights,
+    class_weights = class_weights,
+    scale_pos_weight = scale_pos_weight,
+    info = list(
+      requested = requested,
+      applied = applied,
+      scope = scope,
+      train_counts_before = counts_before,
+      train_counts_after = counts_after,
+      class_weights = class_weights,
+      case_weights = case_weights,
+      seed = seed
+    )
+  )
+}
+
+.stratified_foldid <- function(y, nfolds, seed = 2025L) {
+  y <- factor(y)
+  nfolds <- as.integer(nfolds)
+  if (nfolds < 2L) stop("At least 2 folds are required.", call. = FALSE)
+  set.seed(seed)
+  foldid <- integer(length(y))
+  for (level in levels(y)) {
+    idx <- which(y == level)
+    foldid[idx] <- sample(rep(seq_len(nfolds), length.out = length(idx)))
+  }
+  foldid
+}
+
+.compute_roc_metrics <- function(truth,
+                                 probability,
+                                 positive_class,
+                                 ci_method = c("delong", "bootstrap"),
+                                 conf_level = 0.95,
+                                 boot_n = 2000L,
+                                 seed = 2025L) {
+  .check_ml_deps("pROC")
+  ci_method <- match.arg(ci_method)
+  if (!is.numeric(conf_level) || length(conf_level) != 1L ||
+      !is.finite(conf_level) || conf_level <= 0 || conf_level >= 1) {
+    stop("conf_level must be between 0 and 1.", call. = FALSE)
+  }
+  truth <- factor(truth)
+  if (nlevels(truth) != 2L || !positive_class %in% levels(truth)) {
+    stop("truth must contain two classes including positive_class.", call. = FALSE)
+  }
+  probability <- suppressWarnings(as.numeric(probability))
+  keep <- !is.na(truth) & is.finite(probability)
+  truth <- factor(truth[keep], levels = levels(truth))
+  probability <- probability[keep]
+  negative_class <- setdiff(levels(truth), positive_class)
+  counts <- table(truth)
+  if (any(counts < 2L)) {
+    stop("At least two complete samples per class are required for ROC inference.",
+         call. = FALSE)
+  }
+
+  roc_object <- pROC::roc(
+    response = truth,
+    predictor = probability,
+    levels = c(negative_class, positive_class),
+    direction = "auto",
+    quiet = TRUE
+  )
+  if (ci_method == "bootstrap") set.seed(seed)
+  ci_args <- list(
+    roc = roc_object,
+    conf.level = conf_level,
+    method = if (ci_method == "bootstrap") "bootstrap" else "delong"
+  )
+  if (ci_method == "bootstrap") {
+    ci_args$boot.n <- as.integer(boot_n)
+    ci_args$boot.stratified <- TRUE
+  }
+  ci_auc <- suppressWarnings(do.call(pROC::ci.auc, ci_args))
+  best <- pROC::coords(
+    roc_object,
+    x = "best",
+    best.method = "youden",
+    ret = c("threshold", "sensitivity", "specificity"),
+    transpose = FALSE
+  )
+  if (is.data.frame(best) || is.matrix(best)) best <- best[1L, , drop = FALSE]
+  value <- function(name) as.numeric(best[[name]][[1L]])
+
+  list(
+    auc = as.numeric(pROC::auc(roc_object)),
+    ci_lower = as.numeric(ci_auc[[1L]]),
+    ci_upper = as.numeric(ci_auc[[3L]]),
+    ci_method = ci_method,
+    conf_level = conf_level,
+    threshold = value("threshold"),
+    sensitivity = value("sensitivity"),
+    specificity = value("specificity"),
+    direction = roc_object$direction,
+    n_positive = unname(as.integer(counts[[positive_class]])),
+    n_negative = unname(as.integer(counts[[negative_class]])),
+    roc_object = roc_object
+  )
 }
 
 
@@ -344,5 +622,3 @@ select_features <- function(ml_obj, top_n) {
                   toupper(ml_obj$method), top_n, nrow(imp)))
   return(ml_obj)
 }
-
-
