@@ -15,6 +15,7 @@ README_files
 ^docs$
 ^\.github$
 ^site$
+^build$
 ^skill\.md$
 ^dev$
 ^tcm_output$

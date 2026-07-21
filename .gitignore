@@ -15,6 +15,7 @@ docs/*.md
 
 # build output (CI deploys to gh-pages)
 site/
+build/
 
 # intermediate cache in images/
 docs/images/*_cache.rds
