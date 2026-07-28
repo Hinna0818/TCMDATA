@@ -10,8 +10,9 @@
 #' @param loops Logical. Whether to include self-loops in scoring. Default FALSE.
 #' @param max_depth Numeric. Maximum recursion depth for cluster finding (to prevent stack overflow on huge networks). Default 100.
 #' @param ... Additional arguments passed to `run_mcode` when using the deprecated alias `runMCODE`.
-#' @importFrom igraph is_igraph simplify as_undirected induced_subgraph edge_density vcount V V<-
-#' @return An updated igraph object containing MCODE clustering result.
+#' @importFrom igraph V V<- as_undirected edge_density induced_subgraph is_directed is_igraph simplify vcount
+#' @return The graph with MCODE results, retained edge attributes, and plot-ready
+#'   `cluster` and `candidate` attributes.
 #' @references Bader, G.D., Hogue, C.W. An automated method for finding molecular complexes in large protein interaction networks.
 #' BMC Bioinformatics 4, 2 (2003). https://doi.org/10.1186/1471-2105-4-2
 #' @examples
@@ -33,22 +34,36 @@ run_mcode <- function(g,
     stop("Input 'g' must be an igraph object.")
   }
 
-  if (!loops) {
-    g <- simplify(as_undirected(g), remove.multiple = TRUE, remove.loops = TRUE)
-  } else {
-    g <- simplify(as_undirected(g), remove.multiple = TRUE, remove.loops = FALSE)
+  edge_attr_comb <- list(score = "max", weight = "max", "first")
+  if (is_directed(g)) {
+    g <- as_undirected(
+      g,
+      mode = "collapse",
+      edge.attr.comb = edge_attr_comb
+    )
   }
+  g <- simplify(
+    g,
+    remove.multiple = TRUE,
+    remove.loops = !loops,
+    edge.attr.comb = edge_attr_comb
+  )
 
-  if (vcount(g) < 2) {
-    warning("Graph is too small.")
-    return(list(complexes = list(), scores = numeric(0), module_scores = numeric(0)))
-  }
-
-  # initialize outputs
+  # initialize outputs before handling small graphs so the return type and
+  # plotting attributes remain consistent.
   V(g)$mcode_score <- 0
   V(g)$mcode_cluster <- NA_character_
   V(g)$mcode_module_score <- NA_real_
   V(g)$mcode_is_seed <- FALSE
+
+  if (vcount(g) < 2) {
+    warning("Graph is too small.")
+    return(.ppi_add_plot_attributes(
+      g,
+      cluster_attr = "mcode_cluster",
+      candidate_attr = "mcode_is_seed"
+    ))
+  }
 
   #  Stage 1: Vertex Weighting (Scoring)
   message("Stage 1: Vertex Weighting (k-core * density)...")
@@ -105,7 +120,11 @@ run_mcode <- function(g,
     }
   }
 
-  return(g)
+  .ppi_add_plot_attributes(
+    g,
+    cluster_attr = "mcode_cluster",
+    candidate_attr = "mcode_is_seed"
+  )
 }
 
 
@@ -339,5 +358,3 @@ runMCODE <- function(...) {
   warning("runMCODE is deprecated. Please use run_mcode instead.")
   run_mcode(...)
 }
-
-

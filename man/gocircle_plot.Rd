@@ -15,9 +15,9 @@ gocircle_plot(
   padjust_col = c("#FF906F", "#861D30"),
   bg.col = "gray95",
   max_width = 2.5,
-  fontsize = 8,
-  fontface = "bold",
-  fontfamily = "sans",
+  fontsize = 7,
+  fontface = "plain",
+  fontfamily = "Arial",
   ...
 )
 }
@@ -46,7 +46,7 @@ gocircle_plot(
 
 \item{fontface}{Character. Font style, e.g. "plain", "bold", "italic".}
 
-\item{fontfamily}{Character. Font family, e.g. "sans", "serif", "mono".}
+\item{fontfamily}{Character. Font family. Default is \code{"Arial"}.}
 
 \item{...}{Additional parameters for flexibility.}
 }

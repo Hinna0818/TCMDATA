@@ -41,7 +41,8 @@ runMCODE(...)
 \item{...}{Additional arguments passed to \code{run_mcode} when using the deprecated alias \code{runMCODE}.}
 }
 \value{
-An updated igraph object containing MCODE clustering result.
+The graph with MCODE results, retained edge attributes, and plot-ready
+\code{cluster} and \code{candidate} attributes.
 }
 \description{
 Molecular Complex Detection (MCODE) method for identifying PPI clusters.

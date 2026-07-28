@@ -16,7 +16,8 @@ value is supplied, it is treated as the edge attribute name. Set to NA to
 perform unweighted clustering.}
 }
 \value{
-The input \code{igraph} object with a new vertex attribute \code{fastgreedy_cluster}.
+The graph with \code{fastgreedy_cluster} and plot-ready \code{cluster}
+attributes.
 }
 \description{
 This function performs fast greedy modularity optimization on an igraph object.

@@ -15,16 +15,17 @@ ggdot_sankey(
   id_y_pos = 1.1,
   desc_y_pos = 1,
   pathway_wrap = 50,
-  sankey_text_size = 4,
+  sankey_text_size = 2.5,
   bubble_size_range = c(3, 8),
   dot_palette = "RdBu",
   dot_x_var = c("GeneRatio", "RichFactor", "FoldEnrichment"),
   bubble_p_label = "p.adjust",
   sankey_width = 2,
   dot_width = 1,
-  font_family = "sans",
+  font_family = "Arial",
   font_face = "plain",
-  gene_fontface = "italic",
+  gene_fontface = "plain",
+  base_size = 7,
   sankey_lab = "Gene-Pathway",
   seed = 2025,
   ...
@@ -48,7 +49,7 @@ the Sankey diagram. Default is \code{c("Pathway", "Gene")}.}
 
 \item{pathway_wrap}{Integer. The maximum line width for pathway label wrapping. Default is \code{50}.}
 
-\item{sankey_text_size}{Numeric. Font size for text labels in the Sankey diagram. Default is \code{4}.}
+\item{sankey_text_size}{Numeric. Font size for text labels in the Sankey diagram. Default is \code{2.5}.}
 
 \item{bubble_size_range}{Numeric vector of length 2. Range of point sizes in the dot plot. Default is \code{c(3, 8)}.}
 
@@ -64,9 +65,11 @@ the Sankey diagram. Default is \code{c("Pathway", "Gene")}.}
 
 \item{font_family}{Character. Font family for all text elements. Default is \code{"Arial"}.}
 
-\item{font_face}{Character. Font face for all text. Default is \code{"plain"}.}
+\item{font_face}{Character. Font face for Sankey labels. Default is \code{"plain"}.}
 
-\item{gene_fontface}{Character. Font face for gene labels (rightmost axis). Default is \code{"italic"}.}
+\item{gene_fontface}{Character. Font face for gene labels (rightmost axis). Default is \code{"plain"}.}
+
+\item{base_size}{Numeric. Base font size for axes and legends. Default is \code{7}.}
 
 \item{sankey_lab}{Character. Label for the x-axis of the Sankey diagram. Default is \code{"Gene-Pathway"}.}
 

@@ -101,7 +101,7 @@ getGores <- function(x,
 #' @param max_width Maximum width of up/down bars.
 #' @param fontsize Numeric. Font size for labels and legends.
 #' @param fontface Character. Font style, e.g. "plain", "bold", "italic".
-#' @param fontfamily Character. Font family, e.g. "sans", "serif", "mono".
+#' @param fontfamily Character. Font family. Default is `"Arial"`.
 #' @param ... Additional parameters for flexibility.
 #'
 #' @importFrom grid gpar unit
@@ -123,9 +123,9 @@ gocircle_plot <- function(
     padjust_col = c("#FF906F", "#861D30"),
     bg.col = "gray95",
     max_width = 2.5,
-    fontsize = 8,
-    fontface = "bold",
-    fontfamily = "sans",
+    fontsize = 7,
+    fontface = "plain",
+    fontfamily = "Arial",
     ...){
 
   # Check for ComplexHeatmap availability
@@ -139,6 +139,18 @@ gocircle_plot <- function(
   }
   
   x1 <- getGores(x, up_genes = up_genes, down_genes = down_genes, top = top)
+
+  plot_fontfamily <- .resolve_tcm_font_family(fontfamily)
+  font_code <- switch(
+    fontface,
+    plain = 1,
+    bold = 2,
+    italic = 3,
+    bold.italic = 4,
+    1
+  )
+  old_par <- graphics::par(family = plot_fontfamily, font = font_code)
+  on.exit(graphics::par(old_par), add = TRUE)
 
   circlize::circos.clear()
   on.exit(circlize::circos.clear(), add = TRUE)
@@ -162,7 +174,7 @@ gocircle_plot <- function(
         labels = c("0", "10", "100", "1000", "10000"), minor.ticks = 0,
         labels.facing = "clockwise", labels.niceFacing = FALSE)
 
-      circlize::circos.text(xlim, ylim, sector.name, cex = 0.5, col = "black", font = 2, niceFacing = FALSE)
+      circlize::circos.text(xlim, ylim, sector.name, cex = 0.5, col = "black", font = 1, niceFacing = FALSE)
     })
 
   ## second round
@@ -181,7 +193,7 @@ gocircle_plot <- function(
       ylim <- circlize::get.cell.meta.data("ycenter")
       xlim <- (region[1, 1] + region[1, 2]) / 2
       term_number <- x1[sector.name, "BgRatio1"]
-      circlize::circos.text(xlim, ylim, term_number, cex = 0.6, col = "black", font = 2, niceFacing = FALSE)
+      circlize::circos.text(xlim, ylim, term_number, cex = 0.6, col = "black", font = 1, niceFacing = FALSE)
     }
   )
 
@@ -245,7 +257,11 @@ gocircle_plot <- function(
     })
 
   ## legend
-  text_gp <- grid::gpar(fontsize = fontsize, fontface = fontface, fontfamily = fontfamily)
+  text_gp <- grid::gpar(
+    fontsize = fontsize,
+    fontface = fontface,
+    fontfamily = plot_fontfamily
+  )
 
   category_legend <- ComplexHeatmap::Legend(
     labels = names(cat_col), type = "points", pch = NA,

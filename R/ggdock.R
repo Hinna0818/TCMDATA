@@ -5,6 +5,8 @@
 #' @param type Type of visualization, either `"dot"` or `"tile"`.
 #' @param point_size Numeric. Point size used in dot plots. Default is 3.
 #' @param base_size Numeric. Base font size for the theme. Default is 7.
+#' @param base_family Character. Font family used throughout the plot.
+#'   Default is `"Arial"`.
 #' @param angle Numeric. Rotation angle for x-axis text labels. Default is 50.
 #' @param hjust,vjust Numeric. Horizontal and vertical justification for x-axis labels.
 #' @param palette Character. Name of the continuous color palette to use via
@@ -14,7 +16,8 @@
 #' @param label_digits Integer. Number of digits to show for the affinity text. Default `2`.
 #' @param label_size Numeric. Text size for affinity labels. Default `3.5`.
 #' @param label_color Character. Text color for affinity labels. Default `"black"`.
-#' @param label_family Character. Font family for labels (e.g., `"sans"`, `"Times"`). Default `"sans"`.
+#' @param label_family Character. Font family for labels. By default, follows
+#'   `base_family`.
 #' @param label_fontface Character. Font face for labels: `"plain"`, `"bold"`, `"italic"`, `"bold.italic"`. Default `"plain"`.
 #' @param ... Additional parameters passed to `geom_point()` or `geom_tile()`.
 #'
@@ -38,6 +41,7 @@ ggdock <- function(
     type = "dot",
     point_size = 3,
     base_size = 7,
+    base_family = "Arial",
     angle = 50,
     hjust = 1,
     vjust = 1,
@@ -46,10 +50,12 @@ ggdock <- function(
     label_digits = 2,
     label_size = 3,
     label_color = "black",
-    label_family = "sans",
+    label_family = base_family,
     label_fontface = "plain",
     ...){
 
+  base_family <- .resolve_tcm_font_family(base_family)
+  label_family <- .resolve_tcm_font_family(label_family)
   if (!is.null(palette) && !requireNamespace("paletteer", quietly = TRUE)) {
     stop("Package 'paletteer' is required for ggdock(). Please install it with: install.packages('paletteer')")
   }
@@ -86,7 +92,11 @@ ggdock <- function(
     p <- ggplot(data = df_long, aes(x = .data[["molecule"]], y = .data[["target"]])) +
       geom_point(aes(color = .data[["affinity"]]), size = point_size, ...) +
       labs(x = NULL, y = NULL, color = "Binding affinity\n(kcal/mol)") +
-      .theme_tcm_pub(base_size = base_size, grid = "both") +
+      .theme_tcm_pub(
+        base_size = base_size,
+        base_family = base_family,
+        grid = "both"
+      ) +
       theme(
         axis.text.x = element_text(angle = angle, hjust = hjust, vjust = vjust),
         axis.line = element_blank(),
@@ -109,7 +119,11 @@ ggdock <- function(
     p <- ggplot(data = df_long, aes(x = .data[["molecule"]], y = .data[["target"]], fill = .data[["affinity"]])) +
       geom_tile(...) +
       labs(x = NULL, y = NULL, fill = "Binding affinity\n(kcal/mol)") +
-      .theme_tcm_pub(base_size = base_size, grid = "none") +
+      .theme_tcm_pub(
+        base_size = base_size,
+        base_family = base_family,
+        grid = "none"
+      ) +
       theme(
         axis.text.x = element_text(angle = angle, hjust = hjust, vjust = vjust),
         axis.line = element_blank(),

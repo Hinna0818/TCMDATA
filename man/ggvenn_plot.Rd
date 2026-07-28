@@ -12,6 +12,9 @@ ggvenn_plot(
   use.color.as.text = TRUE,
   name.size = 3.2,
   text.size = 2.8,
+  font.family = "Arial",
+  font.face = "plain",
+  base_size = 7,
   stroke.color = "grey25",
   stroke.size = 0.35,
   show.percentage = FALSE,
@@ -34,6 +37,12 @@ ggvenn_plot(
 \item{name.size}{Font size for set names.}
 
 \item{text.size}{Font size for intersection counts.}
+
+\item{font.family}{Font family used for set names and counts.}
+
+\item{font.face}{Font face used for set names and counts.}
+
+\item{base_size}{Base font size for other plot text.}
 
 \item{stroke.color}{Circle border color. Default is 'black'.}
 

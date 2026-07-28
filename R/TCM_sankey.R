@@ -5,10 +5,10 @@
 #' @param herb_cols Character vector defining the base color palette for the herb layer.
 #' @param mol_cols Character vector defining the base color palette for the molecule.
 #' @param target_cols Character vector defining the base color palette for the target.
-#' @param plot_font Character string specifying the font family used for text. Default is \code{"sans"}.
+#' @param plot_font Character string specifying the font family used for text. Default is \code{"Arial"}.
 #' @param font_face Character string specifying the font face. Default is \code{"plain"}.
-#' @param target_fontface Character string specifying the font face for target labels (rightmost axis). Default is \code{"italic"}.
-#' @param font_size Numeric value controlling the size of node labels. Default is \code{3.5}.
+#' @param target_fontface Character string specifying the font face for target labels (rightmost axis). Default is \code{"plain"}.
+#' @param font_size Numeric value controlling the size of node labels. Default is \code{2.5}.
 #' @param width Numeric value controlling the width of both nodes and flows. Default is \code{0.05}.
 #' @param alpha Numeric value controlling the transparency of the flows. Default is \code{0.3}.
 #' @param knot.pos Numeric value (between 0 and 1) determining the curvature position of flow lines. Default is \code{0.3}.
@@ -33,12 +33,13 @@ tcm_sankey <- function(
                     "#D8A24A", "#E15759"),
     plot_font = "Arial",
     font_face = "plain",
-    target_fontface = "italic",
-    font_size = 2.2,
+    target_fontface = "plain",
+    font_size = 2.5,
     width = 0.05,
     alpha = 0.3,
     knot.pos = 0.3)
 {
+  plot_font <- .resolve_tcm_font_family(plot_font)
   if (!requireNamespace("ggalluvial", quietly = TRUE)) {
     stop("Package 'ggalluvial' is required for tcm_sankey(). Please install it.")
   }
@@ -138,11 +139,6 @@ TCM_sankey <- function(...) {
   warning("TCM_sankey is deprecated. Please use tcm_sankey instead.")
   tcm_sankey(...)
 }
-
-
-
-
-
 
 
 

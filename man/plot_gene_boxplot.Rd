@@ -19,7 +19,8 @@ plot_gene_boxplot(
   scales = "free_y",
   p_label = c("p.format", "p.signif", "p.adj"),
   p_adjust_method = "BH",
-  base_size = 7
+  base_size = 7,
+  base_family = "Arial"
 )
 }
 \arguments{
@@ -69,8 +70,10 @@ default), \code{"p.signif"} (stars: ns / * / ** / *** / ****), or
 when \code{p_label = "p.adj"}.  When only a single gene is tested,
 \code{p_adj} equals \code{p_value} regardless of method.}
 
-\item{base_size}{Base font size for \code{\link[ggplot2]{theme_bw}}.
+\item{base_size}{Base font size for the standardized TCMDATA theme.
 Default 7.}
+
+\item{base_family}{Font family used throughout the plot. Default \code{"Arial"}.}
 }
 \value{
 A \code{ggplot} object.

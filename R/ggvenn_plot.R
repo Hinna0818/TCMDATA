@@ -10,6 +10,9 @@
 #' @param use.color.as.text Logical; if TRUE, use fill color as set name text color.
 #' @param name.size Font size for set names.
 #' @param text.size Font size for intersection counts.
+#' @param font.family Font family used for set names and counts.
+#' @param font.face Font face used for set names and counts.
+#' @param base_size Base font size for other plot text.
 #' @param stroke.color Circle border color. Default is 'black'.
 #' @param stroke.size Circle border thickness. Default is 0.6.
 #' @param show.percentage Logical; whether to show percentages instead of raw counts.
@@ -31,13 +34,17 @@ ggvenn_plot <- function(venn_df,
                           use.color.as.text = TRUE,
                           name.size = 3.2,
                           text.size = 2.8,
+                          font.family = "Arial",
+                          font.face = "plain",
+                          base_size = 7,
                           stroke.color = "grey25",
                           stroke.size = 0.35,
                           show.percentage = FALSE,
                           show.elements = FALSE,
                           digits = 1,
                           expand_ratio = 0.2) {
-  
+
+  font.family <- .resolve_tcm_font_family(font.family)
   if (!requireNamespace("ggvenn", quietly = TRUE)) {
     stop("Package 'ggvenn' is required for ggvenn_plot(). Please install it.")
   }
@@ -87,6 +94,17 @@ ggvenn_plot <- function(venn_df,
     }
   ) +
     ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = expand_ratio))
-  
+
+  for (i in seq_along(p$layers)) {
+    if (inherits(p$layers[[i]]$geom, "GeomText")) {
+      p$layers[[i]]$aes_params$family <- font.family
+      p$layers[[i]]$aes_params$fontface <- font.face
+    }
+  }
+  p <- p + .theme_tcm_text(
+    base_size = base_size,
+    base_family = font.family
+  )
+
   return(p)
 }

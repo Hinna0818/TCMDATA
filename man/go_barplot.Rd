@@ -13,6 +13,8 @@ go_barplot(
   label.size = 3.2,
   show_count = TRUE,
   label.bold = FALSE,
+  base_size = 7,
+  base_family = "Arial",
   x.angle = 60,
   legend.position = "top",
   plot_title = NULL,
@@ -35,6 +37,11 @@ go_barplot(
 \item{show_count}{Logical. Whether to show count labels on bars. Default is TRUE.}
 
 \item{label.bold}{Logical. Whether count labels should be bold. Default is FALSE.}
+
+\item{base_size}{Numeric. Base font size. Default is 7.}
+
+\item{base_family}{Character. Font family used throughout the plot.
+Default is \code{"Arial"}.}
 
 \item{x.angle}{Numeric. Rotation angle of x-axis text (pathway descriptions). Default is 60.}
 
