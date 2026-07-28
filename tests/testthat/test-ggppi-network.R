@@ -3,6 +3,8 @@ test_that("ggppi_network maps degree to node colour and size", {
   plot <- ggppi_network(graph, metric = "degree", show_text = FALSE)
 
   expect_s3_class(plot, "ggplot")
+  expect_s3_class(plot$theme$axis.text, "element_blank")
+  expect_s3_class(plot$theme$axis.title, "element_blank")
   expect_equal(plot$data[[".tcm_colour_metric"]], rep(2, 6))
   expect_equal(plot$data[[".tcm_size_metric"]], rep(2, 6))
   expect_length(plot$layers, 2)

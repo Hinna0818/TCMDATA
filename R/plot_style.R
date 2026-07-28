@@ -69,7 +69,13 @@
 .theme_tcm_void <- function(base_size = 7, base_family = "Arial") {
   base_family <- .resolve_tcm_font_family(base_family)
   theme_void(base_size = base_size, base_family = base_family) +
-    .theme_tcm_text(base_size = base_size, base_family = base_family)
+    .theme_tcm_text(base_size = base_size, base_family = base_family) +
+    theme(
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      axis.ticks = element_blank(),
+      axis.line = element_blank()
+    )
 }
 
 #' @keywords internal
