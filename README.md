@@ -1,4 +1,4 @@
-# TCMDATA: Traditional Chinese Medicine Data Analysis and Visualization R Package
+# TCMDATA: an integrated R package for target-oriented network pharmacology analysis and AI-assisted interpretation in traditional Chinese medicine
 
 <img src="man/figures/logo.png" height="200" align="right" />
 
