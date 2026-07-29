@@ -11,6 +11,9 @@
 #' @param color.intersect.by Color scheme for intersection bars.
 #' @param color.set.by Color scheme for set bars.
 #' @param remove_empty_intersects Whether to remove empty intersections.
+#' @param base_size Base font size. Default is 7.
+#' @param base_family Font family used throughout the plot. Default is
+#'   `"Arial"`.
 #'
 #' @return An UpSet plot object returned by \code{aplotExtra}.
 #'
@@ -30,7 +33,10 @@ upsetplot <- function(list,
                       order.set.by = c("size", "name"),
                       color.intersect.by = "none",
                       color.set.by = "none",
-                      remove_empty_intersects = TRUE) {
+                      remove_empty_intersects = TRUE,
+                      base_size = 7,
+                      base_family = "Arial") {
+  base_family <- .resolve_tcm_font_family(base_family)
   if (!requireNamespace("aplotExtra", quietly = TRUE)) {
     stop("Package 'aplotExtra' is required for upsetplot(). Please install it first.",
          call. = FALSE)
@@ -49,7 +55,7 @@ upsetplot <- function(list,
     names(list)[!nzchar(nm)] <- paste("Set", which(!nzchar(nm)), sep = "_")
   }
 
-  aplotExtra::upset_plot(
+  p <- aplotExtra::upset_plot(
     list = list,
     nintersects = nintersects,
     order.intersect.by = match.arg(order.intersect.by),
@@ -58,4 +64,12 @@ upsetplot <- function(list,
     color.set.by = color.set.by,
     remove_empty_intersects = remove_empty_intersects
   )
+
+  p$plotlist <- lapply(p$plotlist, function(panel) {
+    panel + .theme_tcm_text(
+      base_size = base_size,
+      base_family = base_family
+    )
+  })
+  p
 }

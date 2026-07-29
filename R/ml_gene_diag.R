@@ -465,8 +465,9 @@ plot_gene_roc <- function(genes,
 #'   \code{p_adj} column in \code{attr(, "test_table")} and to the annotation
 #'   when \code{p_label = "p.adj"}.  When only a single gene is tested,
 #'   \code{p_adj} equals \code{p_value} regardless of method.
-#' @param base_size Base font size for \code{\link[ggplot2]{theme_bw}}.
+#' @param base_size Base font size for the standardized TCMDATA theme.
 #'   Default 7.
+#' @param base_family Font family used throughout the plot. Default `"Arial"`.
 #'
 #' @return A \code{ggplot} object.
 #'   \code{attr(, "test_table")} contains a \code{data.frame}:
@@ -500,8 +501,10 @@ plot_gene_boxplot <- function(genes,
                               scales = "free_y",
                               p_label = c("p.format", "p.signif", "p.adj"),
                               p_adjust_method = "BH",
-                              base_size = 7) {
+                              base_size = 7,
+                              base_family = "Arial") {
 
+  base_family <- .resolve_tcm_font_family(base_family)
   test_method <- match.arg(test_method)
   p_label <- match.arg(p_label)
   p_adjust_method <- match.arg(p_adjust_method,
@@ -629,14 +632,22 @@ plot_gene_boxplot <- function(genes,
     geom_text(
       data = bracket_df,
       aes(x = 1.5, y = .data$y_lab, label = .data$label),
-      inherit.aes = FALSE, size = base_size / 2.8, colour = "grey20"
+      inherit.aes = FALSE,
+      size = base_size / 2.8,
+      family = base_family,
+      fontface = "plain",
+      colour = "grey20"
     )
 
   p <- p +
     facet_wrap(~ gene, scales = scales, ncol = ncol) +
     scale_fill_manual(values = stats::setNames(palette, lvls)) +
     labs(x = NULL, y = "Expression", fill = "Group") +
-    .theme_tcm_pub(base_size = base_size, grid = "y") +
+    .theme_tcm_pub(
+      base_size = base_size,
+      base_family = base_family,
+      grid = "y"
+    ) +
     theme(
       strip.text = element_text(face = "italic"),
       legend.position = "bottom"

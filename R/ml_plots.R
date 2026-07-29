@@ -16,10 +16,7 @@ plot_enet_cv <- function(result, ...) {
     stop("result must be a tcm_ml object from ml_enet() / ml_lasso() / ml_ridge()")
   if (!requireNamespace("glmnet", quietly = TRUE))
     stop("Package 'glmnet' is required")
-  old_par <- graphics::par(
-    family = "Arial", cex = 0.75, cex.axis = 0.75,
-    cex.lab = 0.85, lwd = 0.8, bty = "l"
-  )
+  old_par <- .par_tcm_pub()
   on.exit(graphics::par(old_par), add = TRUE)
   graphics::plot(result$cv_fit, ...)
   invisible(NULL)
@@ -58,10 +55,7 @@ plot_enet_path <- function(result, top_n = 20, xvar = "lambda", ...) {
     fit$beta <- fit$beta[keep, , drop = FALSE]
   }
 
-  old_par <- graphics::par(
-    family = "Arial", cex = 0.75, cex.axis = 0.75,
-    cex.lab = 0.85, lwd = 0.8, bty = "l"
-  )
+  old_par <- .par_tcm_pub()
   on.exit(graphics::par(old_par), add = TRUE)
   graphics::plot(fit, xvar = xvar, ...)
   if (xvar == "lambda") {

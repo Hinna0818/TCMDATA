@@ -19,14 +19,16 @@
 #' @param cluster_cols Logical. Perform hierarchical clustering on columns?
 #'   Default \code{FALSE}.
 #' @param row_fontsize Numeric. Font size for row (gene) names.
-#'   Default \code{6.5}.
+#'   Default \code{7}.
 #' @param row_fontface Character. Font face for row names. One of
 #'   \code{"plain"}, \code{"italic"}, \code{"bold"}, or
-#'   \code{"bold.italic"}. Default \code{"italic"}.
+#'   \code{"bold.italic"}. Default \code{"plain"}.
 #' @param col_fontsize Numeric. Font size for column (metric) names.
-#'   Default \code{6.5}.
+#'   Default \code{7}.
 #' @param col_fontface Character. Font face for column names. Default
-#'   \code{"bold"}.
+#'   \code{"plain"}.
+#' @param fontfamily Character. Font family used throughout the heatmap.
+#'   Default is \code{"Arial"}.
 #' @param col_rotation Numeric. Rotation angle (degrees) for column labels.
 #'   Default \code{45}.
 #' @param show_row_names Logical. Show row names? Default \code{TRUE}.
@@ -58,10 +60,11 @@ plot_node_heatmap <- function(data,
                               colors = c("#4E79A7", "white", "#B85C5C"),
                               cluster_rows = TRUE,
                               cluster_cols = FALSE,
-                              row_fontsize = 6.5,
-                              row_fontface = "italic",
-                              col_fontsize = 6.5,
-                              col_fontface = "bold",
+                              row_fontsize = 7,
+                              row_fontface = "plain",
+                              col_fontsize = 7,
+                              col_fontface = "plain",
+                              fontfamily = "Arial",
                               col_rotation = 45,
                               show_row_names = TRUE,
                               show_column_names = TRUE,
@@ -74,6 +77,8 @@ plot_node_heatmap <- function(data,
     stop("Package 'ComplexHeatmap' is required. ",
          "Install via: BiocManager::install(\"ComplexHeatmap\")")
   }
+
+  plot_fontfamily <- .resolve_tcm_font_family(fontfamily)
 
   if (!id_col %in% colnames(data)) {
     stop("Column '", id_col, "' not found in the input data.")
@@ -118,14 +123,30 @@ plot_node_heatmap <- function(data,
     show_row_names    = show_row_names,
     show_column_names = show_column_names,
     rect_gp           = rect_gp,
-    row_names_gp      = gpar(fontsize = row_fontsize, fontface = row_fontface),
-    column_names_gp   = gpar(fontsize = col_fontsize, fontface = col_fontface),
+    row_names_gp      = gpar(
+      fontsize = row_fontsize,
+      fontface = row_fontface,
+      fontfamily = plot_fontfamily
+    ),
+    column_names_gp   = gpar(
+      fontsize = col_fontsize,
+      fontface = col_fontface,
+      fontfamily = plot_fontfamily
+    ),
     column_names_rot  = col_rotation,
     row_dend_width    = unit(10, "mm"),
-    column_title_gp   = gpar(fontsize = col_fontsize, fontface = "bold"),
+    column_title_gp   = gpar(
+      fontsize = col_fontsize,
+      fontface = "plain",
+      fontfamily = plot_fontfamily
+    ),
     heatmap_legend_param = list(
-      title_gp = gpar(fontsize = col_fontsize, fontface = "bold"),
-      labels_gp = gpar(fontsize = col_fontsize)
+      title_gp = gpar(
+        fontsize = col_fontsize,
+        fontface = "plain",
+        fontfamily = plot_fontfamily
+      ),
+      labels_gp = gpar(fontsize = col_fontsize, fontfamily = plot_fontfamily)
     ),
     ...
   )

@@ -11,7 +11,8 @@ radar_plot(
   fill_color = "#A0CBE8",
   line_color = "#4E79A7",
   title = NULL,
-  base_size = 7
+  base_size = 7,
+  base_family = "Arial"
 )
 }
 \arguments{
@@ -31,6 +32,9 @@ for metric values (usually scaled to \eqn{[0, 1]}). Defaults to \code{"value"}.}
 \item{title}{Character; plot title. Default is NULL.}
 
 \item{base_size}{Numeric. Base font size for the plot. Default \code{7}.}
+
+\item{base_family}{Character. Font family used throughout the plot.
+Default is \code{"Arial"}.}
 }
 \value{
 A \code{ggplot} object.

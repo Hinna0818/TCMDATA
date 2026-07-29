@@ -95,6 +95,8 @@ get_node_profile <- function(tab,
 #' @param line_color Polygon border color.
 #' @param title Character; plot title. Default is NULL.
 #' @param base_size Numeric. Base font size for the plot. Default \code{7}.
+#' @param base_family Character. Font family used throughout the plot.
+#'   Default is \code{"Arial"}.
 #'
 #' @return A \code{ggplot} object.
 #'
@@ -110,7 +112,9 @@ radar_plot <- function(profile_df,
                        fill_color = "#A0CBE8",
                        line_color = "#4E79A7",
                        title = NULL,
-                       base_size = 7) {
+                       base_size = 7,
+                       base_family = "Arial") {
+  base_family <- .resolve_tcm_font_family(base_family)
   data <- profile_df
   angle <- NULL
 
@@ -182,21 +186,24 @@ radar_plot <- function(profile_df,
         y = cos(.data$angle) * (max_value * 1.25),
         label = !!rlang::sym(category_col)
       ),
-      size = base_size / 2.8
+      size = base_size / 2.8,
+      family = base_family,
+      fontface = "plain"
     ) +
     geom_text(
       data = axis_labels,
       aes(x = .data$x, y = .data$y, label = .data$label),
-      color = "grey40", size = base_size / 3.1, vjust = -0.5
+      color = "grey40", size = base_size / 3.1, vjust = -0.5,
+      family = base_family
     ) +
     coord_equal(clip = "off") +
-    .theme_tcm_void(base_size = base_size) +
+    .theme_tcm_void(base_size = base_size, base_family = base_family) +
     theme(
       plot.margin = margin(10, 30, 10, 10))
 
   if (!is.null(title)){
     p <- p + ggtitle(title) +
-      theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+      theme(plot.title = element_text(hjust = 0.5, face = "plain"))
   }
 
   return(p)

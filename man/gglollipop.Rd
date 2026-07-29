@@ -10,7 +10,8 @@ gglollipop(
   top_n = 10,
   orderBy = NULL,
   text.col = "black",
-  text.size = 8,
+  text.size = 7,
+  font.family = "Arial",
   text.width = 35,
   palette = "RdBu",
   line.col = "grey60",
@@ -32,7 +33,10 @@ gglollipop(
 
 \item{text.col}{Character. Colors for text. Default is \code{black}.}
 
-\item{text.size}{Numeric. Font size for axis text and title. Default is 8.}
+\item{text.size}{Numeric. Base font size for plot text. Default is 7.}
+
+\item{font.family}{Character. Font family used throughout the plot.
+Default is \code{"Arial"}.}
 
 \item{text.width}{Numeric. Font width for axis text and title. Default is 35.}
 
