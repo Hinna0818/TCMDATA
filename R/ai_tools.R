@@ -265,6 +265,11 @@ create_tcm_tools <- function(task_type = NULL, tool_names = NULL) {
     preview = artifact$preview
   )
 
+  if (identical(artifact_type, "plot")) {
+    base$global_name <- artifact$artifact_id
+    base$global_environment <- ".GlobalEnv"
+  }
+
   if (length(warnings) > 0) {
     base$quality_warnings <- warnings
   }

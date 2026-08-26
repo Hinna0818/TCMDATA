@@ -42,6 +42,7 @@ This skill acts as a persistent "taste vector" — a set of user-defined default
 - Enrichment: show top 20 terms by default
 - PPI: label top 10 hub genes
 - Default plot dimensions: 10 x 8 inches at 300 DPI
+- For every explicit plot request, create a plot artifact, export it to `.GlobalEnv` under its artifact ID, and report that object name to the user
 
 ## Reporting Style
 

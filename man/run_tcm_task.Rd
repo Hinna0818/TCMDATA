@@ -19,7 +19,9 @@ run_tcm_task(agent, task, model = NULL, verbose = TRUE)
 A list with:
 \item{text}{The agent's final response text.}
 \item{artifacts}{List of artifact handles created during execution.}
-\item{tool_calls}{Log of tool calls made.}
+\item{tool_calls}{Complete tool-call log across all agent steps.}
+\item{steps}{Number of agent steps, when reported by aisdk.}
+\item{generation_result}{The complete aisdk generation result.}
 }
 \description{
 Executes a natural language task using the provided agent.

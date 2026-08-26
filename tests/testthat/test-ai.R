@@ -25,6 +25,87 @@ mock_generate_object_draft <- function(...) {
   )
 }
 
+test_that(".call_generate_object uses aisdk 1.5 tool-mode output", {
+  captured <- list()
+  local_mocked_bindings(
+    generate_object = function(...) {
+      captured$args <<- list(...)
+      list(
+        object = list(summary = "ok"),
+        valid = TRUE,
+        attempts = 1L
+      )
+    },
+    .package = "aisdk"
+  )
+  old_options <- options(
+    tcm.supports_native_tools = TRUE,
+    tcm.force_json_schema = TRUE
+  )
+  on.exit(options(old_options), add = TRUE)
+
+  result <- .call_generate_object(
+    model = "mock-model",
+    prompt = "prompt",
+    schema = list(type = "object"),
+    system = "system"
+  )
+
+  expect_identical(captured$args$mode, "tool")
+  expect_identical(captured$args$schema_name, "tcm_result")
+  expect_identical(captured$args$max_retries, 1L)
+  expect_false("response_format" %in% names(captured$args))
+  expect_identical(
+    attr(result, "tcm_structured_output_mode", exact = TRUE),
+    "tool"
+  )
+})
+
+test_that(".call_generate_object retains JSON-only relay compatibility", {
+  captured <- list()
+  local_mocked_bindings(
+    generate_object = function(...) {
+      captured$args <<- list(...)
+      list(object = list(summary = "ok"), valid = TRUE, attempts = 1L)
+    },
+    .package = "aisdk"
+  )
+  old_options <- options(
+    tcm.supports_native_tools = FALSE,
+    tcm.force_json_schema = TRUE
+  )
+  on.exit(options(old_options), add = TRUE)
+  schema <- list(type = "object")
+
+  result <- .call_generate_object(
+    model = "mock-model",
+    prompt = "prompt",
+    schema = schema,
+    system = "system"
+  )
+
+  expect_identical(captured$args$mode, "json")
+  expect_identical(captured$args$response_format, schema)
+  expect_identical(
+    attr(result, "tcm_structured_output_mode", exact = TRUE),
+    "json"
+  )
+})
+
+test_that("invalid aisdk structured output is not accepted as valid", {
+  result <- list(
+    object = list(summary = "incomplete"),
+    raw_text = "",
+    valid = FALSE,
+    attempts = 2L
+  )
+
+  extracted <- .extract_object(result, type = "analysis")
+
+  expect_identical(extracted$output_mode, "fallback_text")
+  expect_identical(extracted$output$summary, "")
+})
+
 # ── Tests: dependency check ──────────────────────────────────────────────────
 
 test_that(".check_aisdk errors when aisdk is missing", {
@@ -60,6 +141,7 @@ test_that(".compress_ppi handles data.frame", {
   ctx <- .compress_ppi(df, top_n = 2)
   expect_type(ctx, "character")
   expect_true(grepl("TP53", ctx))
+  expect_match(ctx, "3 nodes total; showing top 2", fixed = TRUE)
 })
 
 test_that(".compress_table handles generic data.frame", {
@@ -73,6 +155,247 @@ test_that(".compress_table handles generic data.frame", {
   expect_type(ctx, "character")
   expect_true(grepl("TP53", ctx))
   expect_true(grepl("logFC", ctx))
+  expect_match(ctx, "Table: 3 rows x 3 cols, showing top 3", fixed = TRUE)
+})
+
+test_that(".compress_table reports total rows before truncation", {
+  df <- data.frame(gene = LETTERS[1:5], score = seq_len(5))
+
+  ctx <- .compress_table(df, top_n = 2)
+
+  expect_match(ctx, "Table: 5 rows x 2 cols, showing top 2", fixed = TRUE)
+})
+
+# ── Tests: workflow execution ───────────────────────────────────────────────
+
+test_that("run_tcm_workflow uses the aisdk 1.5 tool API and retains trace", {
+  fake_tools <- list(
+    list(
+      name = "first_tool",
+      run = function(args) {
+        list(
+          ok = TRUE,
+          artifact_id = "artifact_001",
+          received = args
+        )
+      }
+    ),
+    list(
+      name = "second_tool",
+      run = function(args) {
+        list(ok = TRUE, received = args, detail = list(value = 42L))
+      }
+    )
+  )
+  local_mocked_bindings(
+    create_tcm_tools = function(...) fake_tools,
+    .package = "TCMDATA"
+  )
+
+  workflow <- create_tcm_workflow(
+    "trace_test",
+    list(
+      list(
+        tool = "first_tool",
+        params = list(genes = "{{genes}}")
+      ),
+      list(
+        tool = "second_tool",
+        params = list(
+          artifact_id = "{{from_previous}}",
+          label = "source-{{cohort}}"
+        )
+      )
+    )
+  )
+
+  result <- run_tcm_workflow(
+    workflow,
+    genes = c("IL6", "CASP1"),
+    cohort = "GSE154918",
+    verbose = FALSE
+  )
+  trace <- attr(result, "tool_calls")
+
+  expect_s3_class(result, "tcm_workflow_result")
+  expect_length(result, 2L)
+  expect_identical(result[[1L]]$received$genes, c("IL6", "CASP1"))
+  expect_identical(result[[2L]]$received$artifact_id, "artifact_001")
+  expect_identical(result[[2L]]$received$label, "source-GSE154918")
+  expect_identical(attr(result, "status"), "completed")
+  expect_length(trace, 2L)
+  expect_identical(trace[[1L]]$result, result[[1L]])
+  expect_identical(trace[[2L]]$arguments, result[[2L]]$received)
+  expect_identical(trace[[2L]]$status, "completed")
+  expect_true(is.numeric(trace[[2L]]$duration_seconds))
+})
+
+test_that("run_tcm_workflow retains the failed call and prior results", {
+  fake_tools <- list(
+    list(
+      name = "successful_tool",
+      run = function(args) list(ok = TRUE, artifact_id = "artifact_002")
+    ),
+    list(
+      name = "failing_tool",
+      run = function(args) stop("tool execution failed")
+    )
+  )
+  local_mocked_bindings(
+    create_tcm_tools = function(...) fake_tools,
+    .package = "TCMDATA"
+  )
+
+  workflow <- create_tcm_workflow(
+    "failure_test",
+    list(
+      list(tool = "successful_tool", params = list()),
+      list(
+        tool = "failing_tool",
+        params = list(artifact_id = "{{from_previous}}")
+      )
+    )
+  )
+
+  expect_warning(
+    result <- run_tcm_workflow(workflow, verbose = FALSE),
+    "Step 2 failed"
+  )
+  trace <- attr(result, "tool_calls")
+
+  expect_length(result, 2L)
+  expect_true(result[[1L]]$ok)
+  expect_false(result[[2L]]$ok)
+  expect_match(result[[2L]]$error, "tool execution failed")
+  expect_identical(attr(result, "status"), "failed")
+  expect_identical(trace[[2L]]$arguments$artifact_id, "artifact_002")
+  expect_identical(trace[[2L]]$status, "failed")
+  expect_identical(trace[[2L]]$result, result[[2L]])
+})
+
+test_that("run_tcm_workflow executes a real aisdk 1.5 Tool object", {
+  skip_if_not_installed("aisdk")
+
+  real_tool <- aisdk::tool(
+    name = "echo_tool",
+    description = "Return the supplied value.",
+    parameters = aisdk::z_object(
+      value = aisdk::z_string(description = "Value to return")
+    ),
+    execute = function(args) list(ok = TRUE, value = args$value)
+  )
+  local_mocked_bindings(
+    create_tcm_tools = function(...) list(real_tool),
+    .package = "TCMDATA"
+  )
+  workflow <- create_tcm_workflow(
+    "real_tool_test",
+    list(list(tool = "echo_tool", params = list(value = "{{value}}")))
+  )
+
+  result <- run_tcm_workflow(workflow, value = "IL6", verbose = FALSE)
+
+  expect_true(result[[1L]]$ok)
+  expect_identical(result[[1L]]$value, "IL6")
+  expect_identical(attr(result, "tool_calls")[[1L]]$status, "completed")
+})
+
+# ── Tests: analysis replay scripts ──────────────────────────────────────────
+
+test_that("tool traces produce parseable replay scripts with dependencies", {
+  generation_result <- list(
+    all_tool_calls = list(
+      list(
+        id = "call_001",
+        name = "search_herb_records",
+        arguments = list(herb = "Huangqi", type = "Herb_pinyin_name")
+      ),
+      list(
+        id = "call_002",
+        name = "plot_herb_sankey",
+        arguments = list(
+          artifact_id = "search_001",
+          axis_order = c("herb", "molecule", "target")
+        )
+      )
+    ),
+    all_tool_results = list(
+      list(
+        id = "call_001",
+        raw_result = list(ok = TRUE, artifact_id = "search_001"),
+        is_error = FALSE
+      ),
+      list(
+        id = "call_002",
+        raw_result = list(ok = TRUE, artifact_id = "plot_001"),
+        is_error = FALSE
+      )
+    )
+  )
+
+  script <- .build_tcm_analysis_script(
+    generation_result,
+    task = "Search Huangqi and draw a Sankey plot",
+    turn = 2L,
+    model = "deepseek-chat"
+  )
+  code <- as.character(script)
+
+  expect_s3_class(script, "tcm_analysis_script")
+  expect_match(code, "step_01 <-", fixed = TRUE)
+  expect_match(code, "artifact_id = step_01$artifact_id", fixed = TRUE)
+  expect_match(code, "# Output artifact: plot_001", fixed = TRUE)
+  expect_length(attr(script, "tool_calls"), 2L)
+  expect_silent(parse(text = code))
+
+  replay_tools <- list(
+    list(
+      name = "search_herb_records",
+      run = function(args) list(
+        ok = TRUE,
+        artifact_id = "search_001",
+        arguments = args
+      )
+    ),
+    list(
+      name = "plot_herb_sankey",
+      run = function(args) list(
+        ok = TRUE,
+        artifact_id = "plot_001",
+        arguments = args
+      )
+    )
+  )
+  replay_env <- new.env(parent = globalenv())
+  replay_env$create_tcm_tools <- function(...) replay_tools
+
+  expect_silent(eval(parse(text = code), envir = replay_env))
+  expect_identical(replay_env$step_02$arguments$artifact_id, "search_001")
+})
+
+test_that("analysis scripts are exported to unique global-style names", {
+  target_env <- new.env(parent = emptyenv())
+  assign("tcm_script_001", "existing", envir = target_env)
+  script <- structure(
+    "library(TCMDATA)",
+    class = c("tcm_analysis_script", "character")
+  )
+
+  script_name <- .export_tcm_analysis_script(script, envir = target_env)
+
+  expect_identical(script_name, "tcm_script_002")
+  expect_true(exists(script_name, envir = target_env, inherits = FALSE))
+  exported <- get(script_name, envir = target_env, inherits = FALSE)
+  expect_s3_class(exported, "tcm_analysis_script")
+  expect_identical(attr(exported, "global_name"), script_name)
+  expect_output(print(exported), "library\\(TCMDATA\\)")
+})
+
+test_that("analysis script generation ignores turns without tool calls", {
+  expect_null(.build_tcm_analysis_script(
+    list(text = "No analysis was requested."),
+    task = "Hello"
+  ))
 })
 
 # ── Tests: interpret functions (mocked) ──────────────────────────────────────
@@ -231,12 +554,68 @@ test_that("tcm_interpret text mode passes audience and role to system prompt", {
   expect_true(grepl("Focus on TCM",    captured$task))
 })
 
+test_that("create_tcm_task_agent disables skills with NULL for aisdk 1.5", {
+  skip_if_not_installed("aisdk")
+
+  captured <- list()
+  local_mocked_bindings(
+    create_agent = function(...) {
+      captured$args <<- list(...)
+      list(name = "mock-agent")
+    },
+    .package = "aisdk"
+  )
+
+  create_tcm_task_agent(
+    tools = list(),
+    system_prompt = "test prompt",
+    skills = character(0)
+  )
+
+  expect_null(captured$args$skills)
+})
+
+test_that("the default agent prompt requires plot artifacts in .GlobalEnv", {
+  prompt <- .default_tcm_system_prompt()
+
+  expect_match(prompt, "PLOT OUTPUT RULE", fixed = TRUE)
+  expect_match(prompt, ".GlobalEnv", fixed = TRUE)
+  expect_match(prompt, "global_name", fixed = TRUE)
+})
+
 test_that("custom is absent from provider whitelist", {
   providers <- .available_providers()
   expect_false("custom" %in% providers)
   expect_true("openai"    %in% providers)
   expect_true("anthropic" %in% providers)
   expect_true("gemini"    %in% providers)
+})
+
+test_that("tcm_config persists relay protocol settings", {
+  env_file <- tempfile(fileext = ".env")
+  writeLines(c("OTHER_SETTING=keep", "TCM_API_FORMAT=chat_completions"), env_file)
+
+  expect_message(
+    tcm_config(
+      provider = "deepseek",
+      api_key = "test-key",
+      model = "deepseek-chat",
+      base_url = "https://relay.example.com/v1",
+      path = env_file,
+      api_format = "responses",
+      supports_native_tools = FALSE,
+      disable_stream_options = TRUE,
+      responses_state_mode = "stateless"
+    ),
+    "saved"
+  )
+
+  config <- readLines(env_file)
+  expect_true("OTHER_SETTING=keep" %in% config)
+  expect_true("TCM_API_FORMAT=responses" %in% config)
+  expect_true("TCM_SUPPORTS_NATIVE_TOOLS=false" %in% config)
+  expect_true("TCM_DISABLE_STREAM_OPTIONS=true" %in% config)
+  expect_true("TCM_RESPONSES_STATE_MODE=stateless" %in% config)
 })
 
 test_that("tcm_setup enables aisdk internet-check bypass by default", {
@@ -305,6 +684,198 @@ test_that("tcm_setup test request omits temperature for proxy compatibility", {
   expect_null(captured$args$temperature)
 })
 
+test_that("tcm_setup resolves DeepSeek through the companion provider", {
+  skip_if_not_installed("aisdk")
+
+  captured <- list()
+  fake_provider <- list(
+    language_model = function(model_id) {
+      structure(
+        list(model_id = model_id, provider = "deepseek"),
+        class = "LanguageModelV1"
+      )
+    }
+  )
+
+  local_mocked_bindings(
+    .resolve_tcm_provider_factory = function(provider) {
+      captured$provider <<- provider
+      function(...) {
+        captured$factory_args <<- list(...)
+        fake_provider
+      }
+    },
+    .package = "TCMDATA"
+  )
+  local_mocked_bindings(
+    set_model = function(model) captured$model <<- model,
+    .package = "aisdk"
+  )
+
+  model <- tcm_setup(
+    provider = "deepseek",
+    api_key = "test-key",
+    model = "deepseek-chat",
+    test = FALSE
+  )
+
+  expect_equal(captured$provider, "deepseek")
+  expect_equal(captured$factory_args$api_key, "test-key")
+  expect_equal(model$provider, "deepseek")
+  expect_equal(captured$model$model_id, "deepseek-chat")
+})
+
+test_that("the installed companion package constructs a DeepSeek model", {
+  skip_if_not_installed("aisdk.providers")
+
+  create_deepseek <- .resolve_tcm_provider_factory("deepseek")
+  expect_identical(
+    environmentName(environment(create_deepseek)),
+    "aisdk.providers"
+  )
+
+  provider <- create_deepseek(
+    api_key = "test-key",
+    base_url = "https://api.deepseek.com"
+  )
+  model <- provider$language_model("deepseek-chat")
+
+  expect_true(inherits(model, "LanguageModelV1"))
+  expect_equal(model$provider, "deepseek")
+  expect_equal(model$model_id, "deepseek-chat")
+})
+
+test_that("tcm_setup configures OpenAI-compatible relay endpoints", {
+  skip_if_not_installed("aisdk")
+
+  captured <- list()
+  fake_provider <- list(
+    language_model = function(model_id) {
+      structure(
+        list(model_id = model_id, provider = "deepseek"),
+        class = "LanguageModelV1"
+      )
+    }
+  )
+
+  local_mocked_bindings(
+    create_custom_provider = function(...) {
+      captured$provider_args <<- list(...)
+      fake_provider
+    },
+    set_model = function(model) captured$model <<- model,
+    .package = "aisdk"
+  )
+
+  tcm_setup(
+    provider = "deepseek",
+    api_key = "test-key",
+    model = "deepseek-chat",
+    base_url = "https://relay.example.com/v1",
+    test = FALSE
+  )
+
+  expect_equal(captured$provider_args$provider_name, "deepseek")
+  expect_equal(captured$provider_args$base_url, "https://relay.example.com/v1")
+  expect_equal(captured$provider_args$api_format, "chat_completions")
+  expect_true(captured$provider_args$supports_native_tools)
+  expect_true(captured$provider_args$disable_stream_options)
+  expect_equal(captured$provider_args$responses_state_mode, "stateless")
+})
+
+test_that("tcm_setup supports Responses-compatible relay endpoints", {
+  skip_if_not_installed("aisdk")
+
+  captured <- list()
+  fake_provider <- list(
+    language_model = function(model_id) {
+      structure(
+        list(model_id = model_id, provider = "openai"),
+        class = "LanguageModelV1"
+      )
+    }
+  )
+
+  local_mocked_bindings(
+    create_custom_provider = function(...) {
+      captured$provider_args <<- list(...)
+      fake_provider
+    },
+    set_model = function(model) invisible(NULL),
+    .package = "aisdk"
+  )
+
+  tcm_setup(
+    provider = "openai",
+    api_key = "test-key",
+    model = "gpt-test",
+    base_url = "https://relay.example.com/v1",
+    api_format = "responses",
+    responses_state_mode = "auto",
+    test = FALSE
+  )
+
+  expect_equal(captured$provider_args$api_format, "responses")
+  expect_equal(captured$provider_args$responses_state_mode, "auto")
+})
+
+test_that("tcm_setup selects the native OpenAI Responses model explicitly", {
+  skip_if_not_installed("aisdk")
+
+  captured <- list()
+  fake_provider <- list(
+    language_model = function(model_id) {
+      stop("Chat Completions model should not be selected")
+    },
+    responses_model = function(model_id) {
+      captured$responses_model <<- model_id
+      structure(
+        list(model_id = model_id, provider = "openai"),
+        class = "LanguageModelV1"
+      )
+    }
+  )
+
+  local_mocked_bindings(
+    create_openai = function(...) {
+      captured$provider_args <<- list(...)
+      fake_provider
+    },
+    set_model = function(model) captured$model <<- model,
+    .package = "aisdk"
+  )
+
+  tcm_setup(
+    provider = "openai",
+    api_key = "test-key",
+    model = "gpt-test",
+    api_format = "responses",
+    responses_state_mode = "stateless",
+    test = FALSE
+  )
+
+  expect_equal(captured$provider_args$api_format, "responses")
+  expect_equal(captured$provider_args$responses_state_mode, "stateless")
+  expect_equal(captured$responses_model, "gpt-test")
+  expect_equal(captured$model$model_id, "gpt-test")
+})
+
+test_that("tcm_setup rejects a mismatched native provider protocol", {
+  skip_if_not_installed("aisdk")
+
+  expect_error(
+    tcm_setup(
+      provider = "gemini",
+      api_key = "test-key",
+      model = "gemini-test",
+      api_format = "responses",
+      test = FALSE
+    ),
+    "not supported by the native 'gemini' provider",
+    fixed = TRUE
+  )
+})
+
 test_that(".send_tcm_chat_turn falls back when streaming fails", {
   skip_if_not_installed("aisdk")
 
@@ -370,6 +941,38 @@ test_that(".send_tcm_chat_turn omits temperature for batch chat", {
   expect_null(captured$send_args$temperature)
 })
 
+test_that(".send_tcm_chat_turn preserves the complete streamed result", {
+  complete_calls <- list(
+    list(name = "first_tool", arguments = list(value = 1L)),
+    list(name = "second_tool", arguments = list(value = 2L))
+  )
+  stream_result <- list(
+    text = "stream ok",
+    tool_calls = complete_calls[2L],
+    all_tool_calls = complete_calls,
+    steps = 3L
+  )
+  stream_session <- list(
+    send_stream = function(prompt, callback, ...) {
+      callback("stream ok", done = TRUE)
+      stream_result
+    },
+    get_last_response = function() "stream ok"
+  )
+
+  out <- .send_tcm_chat_turn(
+    chat_session = stream_session,
+    session_agent = list(),
+    model = "mock-model",
+    prompt = "hello",
+    stream = TRUE
+  )
+
+  expect_identical(out$result, stream_result)
+  expect_length(.tcm_result_tool_calls(out$result), 2L)
+  expect_identical(.tcm_result_tool_calls(out$result), complete_calls)
+})
+
 # ── Regression: artifacts, tools, routing ───────────────────────────────────
 
 test_that("artifact registry keeps artifact metadata", {
@@ -418,6 +1021,29 @@ test_that("tool artifacts are immediately available to eval_r_code", {
 
   expect_true(isTRUE(eval_result$ok))
   expect_true(grepl("TP53,AKT1", eval_result$output, fixed = TRUE))
+})
+
+test_that("plot artifacts report their .GlobalEnv object name", {
+  clear_tcm_artifacts()
+  on.exit(clear_tcm_artifacts(), add = TRUE)
+
+  plot_obj <- structure(list(label = "test plot"), class = "test_plot")
+  result <- .save_tool_artifact(
+    object = plot_obj,
+    artifact_type = "plot",
+    function_name = "unit_test_plot"
+  )
+  on.exit(
+    if (exists(result$artifact_id, envir = globalenv(), inherits = FALSE)) {
+      rm(list = result$artifact_id, envir = globalenv())
+    },
+    add = TRUE
+  )
+
+  expect_equal(result$global_name, result$artifact_id)
+  expect_equal(result$global_environment, ".GlobalEnv")
+  expect_true(exists(result$global_name, envir = globalenv(), inherits = FALSE))
+  expect_identical(get(result$global_name, envir = globalenv()), plot_obj)
 })
 
 test_that("create_tcm_tools exposes expanded tool modules", {

@@ -45,7 +45,8 @@ Suggests:
     Matrix,
     paletteer,
     RColorBrewer,
-    aisdk,
+    aisdk (>= 1.5.0),
+    aisdk.providers (>= 0.1.0),
     Boruta,
     caret,
     circlize,
@@ -71,7 +72,9 @@ Suggests:
     org.Hs.eg.db,
     DOSE
 Remotes:
-    YuLab-SMU/aplotExtra
+    YuLab-SMU/aplotExtra,
+    YuLab-SMU/aisdk,
+    YuLab-SMU/aisdk.providers
 License: Artistic-2.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

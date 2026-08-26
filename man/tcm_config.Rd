@@ -4,7 +4,17 @@
 \alias{tcm_config}
 \title{Write AI provider credentials to .env}
 \usage{
-tcm_config(provider, api_key, model, base_url = NULL, path = ".env")
+tcm_config(
+  provider,
+  api_key,
+  model,
+  base_url = NULL,
+  path = ".env",
+  api_format = NULL,
+  supports_native_tools = NULL,
+  disable_stream_options = NULL,
+  responses_state_mode = NULL
+)
 }
 \arguments{
 \item{provider}{Character. Provider name (see Details).}
@@ -18,14 +28,28 @@ tcm_config(provider, api_key, model, base_url = NULL, path = ".env")
 Required for proxies or self-hosted endpoints.}
 
 \item{path}{Character. Path to the \code{.env} file. Default \code{".env"}.}
+
+\item{api_format}{Character or NULL. API protocol used by a custom
+\code{base_url}: \code{"chat_completions"}, \code{"responses"}, or
+\code{"anthropic_messages"}. NULL uses provider-specific defaults.}
+
+\item{supports_native_tools}{Logical or NULL. Whether a relay endpoint
+accepts native tool calls. The relay default is TRUE.}
+
+\item{disable_stream_options}{Logical or NULL. Whether an OpenAI-compatible
+relay should omit \code{stream_options}. The relay default is TRUE.}
+
+\item{responses_state_mode}{Character or NULL. Conversation state mode for
+Responses-compatible endpoints: \code{"stateless"}, \code{"auto"}, or
+\code{"server"}.}
 }
 \value{
 The path to the \code{.env} file, invisibly.
 }
 \description{
-Saves \code{TCM_PROVIDER}, \code{TCM_API_KEY}, \code{TCM_MODEL}, and
-optionally \code{TCM_BASE_URL} to a \code{.env} file. Existing values for
-these four keys are overwritten; all other lines are preserved.
+Saves provider, model, endpoint, and optional API protocol settings to a
+\code{.env} file. Existing \code{TCM_*} settings managed by this function
+are overwritten; all other lines are preserved.
 }
 \details{
 Supported \code{provider} values: \code{"openai"}, \code{"anthropic"},

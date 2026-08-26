@@ -14,25 +14,112 @@ knitr::opts_chunk$set(
 
 ## Prerequisites
 
-The AI module requires both `TCMDATA` and `aisdk`:
+The AI module requires `aisdk` version 1.5.0 or later. DeepSeek and the other additional providers also require the companion `aisdk.providers` package.
 
 ```{r install, eval=FALSE}
-install.packages("aisdk")
-library(aisdk)
+remotes::install_github("YuLab-SMU/aisdk")
+remotes::install_github("YuLab-SMU/aisdk.providers") # required for DeepSeek
 library(TCMDATA)
 ```
 
-Model configuration is handled through `tcm_setup()` and only needs to be called once per session. User must set their own API key and provider to use AI module in this package.
+`tcm_setup()` registers one model for the current R session. Setting `save = TRUE` also writes the configuration to the project `.env` file, allowing later sessions to call `tcm_setup()` without repeating the credentials. Keep `.env` out of version control.
 
-```{r config, eval=FALSE}
+## Provider configuration
+
+### Official OpenAI API
+
+OpenAI is provided directly by `aisdk`:
+
+```{r config-openai, eval=FALSE}
 tcm_setup(
   provider = "openai",
   api_key  = "sk-xxx",
-  model    = "gpt-4o", 
-  base_url = "https://xxx/v1", # if necessary 
-  save     = TRUE,
-  test     = TRUE)
+  model    = "gpt-5-mini",
+  save     = TRUE
+)
 ```
+
+### Official Anthropic API
+
+Use `provider = "anthropic"` for the native Anthropic Messages API. Replace the example model with an exact model ID available to the account.
+
+```{r config-anthropic, eval=FALSE}
+tcm_setup(
+  provider = "anthropic",
+  api_key  = "sk-ant-xxx",
+  model    = "claude-sonnet-4-20250514",
+  save     = TRUE
+)
+```
+
+### Official DeepSeek API
+
+DeepSeek is resolved from `aisdk.providers`. Without a custom endpoint, the provider uses the official DeepSeek API and retains DeepSeek-specific model handling.
+
+```{r config-deepseek, eval=FALSE}
+# Explicitly reset a previously configured relay endpoint, if necessary
+Sys.setenv(DEEPSEEK_BASE_URL = "https://api.deepseek.com")
+Sys.unsetenv("DEEPSEEK_BASE_URLS")
+
+tcm_setup(
+  provider = "deepseek",
+  api_key  = "sk-xxx",
+  model    = "deepseek-chat", # or an available DeepSeek V4 model ID
+  save     = TRUE
+)
+```
+
+Provider-specific environment variables remain active when no `TCM_BASE_URL` is configured. If a DeepSeek request unexpectedly reaches a relay, inspect the endpoint variables before setup:
+
+```{r inspect-provider-env, eval=FALSE}
+Sys.getenv(c("TCM_BASE_URL", "DEEPSEEK_BASE_URL", "DEEPSEEK_BASE_URLS"))
+```
+
+### Relay and proxy endpoints
+
+Pass the API root through `base_url` and explicitly specify the protocol implemented by the relay. The model ID must exactly match the ID listed by that relay.
+
+For an OpenAI Chat Completions-compatible relay, including a relay serving Claude or DeepSeek models:
+
+```{r config-relay-chat, eval=FALSE}
+tcm_setup(
+  provider   = "anthropic",
+  api_key    = "relay-key",
+  model      = "relay-claude-model-id",
+  base_url   = "https://relay.example.com/v1",
+  api_format = "chat_completions",
+  save       = TRUE
+)
+```
+
+For a relay implementing the native Anthropic Messages protocol:
+
+```{r config-relay-anthropic, eval=FALSE}
+tcm_setup(
+  provider   = "anthropic",
+  api_key    = "relay-key",
+  model      = "relay-claude-model-id",
+  base_url   = "https://relay.example.com/v1",
+  api_format = "anthropic_messages",
+  save       = TRUE
+)
+```
+
+For a relay implementing the OpenAI Responses API:
+
+```{r config-relay-responses, eval=FALSE}
+tcm_setup(
+  provider             = "openai",
+  api_key              = "relay-key",
+  model                = "relay-model-id",
+  base_url              = "https://relay.example.com/v1",
+  api_format            = "responses",
+  responses_state_mode  = "stateless",
+  save                  = TRUE
+)
+```
+
+Relay implementations vary. Set `supports_native_tools = FALSE` when native tool calls are rejected; TCMDATA then uses JSON-mode structured output instead of the aisdk 1.5 forced-tool mode. Use `tcm_chat(stream = FALSE)` when streaming is unsupported, and set `force_json_schema = FALSE` only when a JSON-only endpoint rejects `response_format`. Calling `tcm_setup(test = TRUE)` sends a small live request to verify the key and endpoint.
 
 ## Interpretation layer
 
@@ -137,6 +224,8 @@ print(custom_res)
 
 Available field types: `tcm_field_string()`, `tcm_field_number()`, `tcm_field_boolean()`, `tcm_field_array()`, `tcm_field_enum()`.
 
+On endpoints with native tool support, these functions use aisdk's validated forced-tool structured output. Validation status and retry count are recorded in `result$metadata$structured_output_valid` and `result$metadata$structured_output_attempts`.
+
 
 ## Agent layer
 
@@ -198,13 +287,23 @@ tcm_chat()
 
 Key commands: `/help`, `/artifacts`, `/save [WxH]`, `/history`, `/stats`, `/quit`.
 
-The session returns a list with `history` and `artifacts` for programmatic access:
+After each turn that executes one or more tools, `tcm_chat()` creates a deterministic replay script in `.GlobalEnv`. Script objects are named sequentially (`tcm_script_001`, `tcm_script_002`, etc.) and contain the actual tool names, arguments, and artifact dependencies used during that turn:
+
+```{r chat-script, eval=FALSE}
+tcm_script_001                  # print the generated R script
+writeLines(tcm_script_001, "analysis_turn_001.R")
+source(textConnection(tcm_script_001)) # rerun the recorded tool sequence
+```
+
+The session returns `history`, `artifacts`, the complete cross-turn `tool_calls` trajectory, and the exported script names for programmatic access:
 
 ```{r chat-capture, eval=FALSE}
 res <- tcm_chat()
 # After /quit:
 res$artifacts  # all generated artifacts
 res$history    # full conversation history
+res$tool_calls # all tool calls across turns
+res$scripts    # names of replay scripts in .GlobalEnv
 ```
 
 ### Programmatic agent: `create_tcm_task_agent()`
@@ -218,17 +317,20 @@ r1 <- run_tcm_task(agent, "Search Huangqi targets and sepsis targets, compute in
 r2 <- run_tcm_task(agent, "Run GO enrichment on the intersection genes")
 r3 <- run_tcm_task(agent, "Build PPI network and rank hub genes")
 
-# Each result contains: $text, $artifacts, $tool_calls
+# $tool_calls contains calls from every agent step; $generation_result keeps
+# the complete aisdk result for audit or debugging.
 r3$text
+r3$tool_calls
 ```
 
 ### Artifact management
 
-All analysis results are automatically stored as **artifacts** with generated IDs (e.g., `enrich_001`, `ppi_002`). The agent can reference artifacts in subsequent turns, and artifacts can be managed via dedicated functions:
+All analysis results are automatically stored as **artifacts** with generated IDs (e.g., `enrich_001`, `ppi_002`). Tool-generated artifacts are also exported to `.GlobalEnv` under the same ID. When the user requests a visualization, the agent must create a plot artifact, export the plot object to `.GlobalEnv`, and report its object name so that it can be inspected directly in RStudio.
 
 ```{r artifacts-demo, eval=FALSE}
 list_tcm_artifacts()     # list all artifacts
 load_tcm_artifact("enrich_001")  # retrieve the R object
+plot_001                # inspect an exported plot in .GlobalEnv
 clear_tcm_artifacts()    # clear all
 ```
 

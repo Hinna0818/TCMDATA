@@ -72,13 +72,28 @@ TCMDATA integrates an AI agent layer via [aisdk](https://github.com/YuLab-SMU/ai
 
 ```r
 # One-time setup
-install.packages("aisdk")
+remotes::install_github("YuLab-SMU/aisdk")
+
+# Also required when using DeepSeek or another additional provider
+remotes::install_github("YuLab-SMU/aisdk.providers")
 
 tcm_setup(
   provider = "openai",
   api_key  = "sk-xxxx",
-  model    = "gpt-5-mini",
+  model    = "gpt-5.6-sol",
   save     = TRUE
+)
+
+# DeepSeek uses the companion provider package
+tcm_setup("deepseek", "sk-xxxx", "deepseek-chat")
+
+# OpenAI-compatible relay endpoint
+tcm_setup(
+  provider = "anthropic",
+  api_key = "relay-key",
+  model = "relay-claude-model-id",
+  base_url = "https://relay.example.com/v1",
+  api_format = "chat_completions"
 )
 
 # One-shot agent: auto-routes task to appropriate tools
@@ -92,7 +107,7 @@ ai_res <- tcm_interpret(enrich_res, language = "en")
 draft  <- draft_result_paragraph(ai_res, language = "en")
 ```
 
-The agent supports 11 task types including herb/disease/target lookup, enrichment, PPI analysis, ML screening, PubMed search, GEO dataset discovery, and more. Skills can be customized via `tcm_init_skills()`.
+The agent supports 11 task types including herb/disease/target lookup, enrichment, PPI analysis, ML screening, PubMed search, GEO dataset discovery, and more. Plot requests create artifacts that are automatically exported to `.GlobalEnv`. Each tool-using chat turn also exports a replayable script such as `tcm_script_001` for inspection and reuse. Skills can be customized via `tcm_init_skills()`.
 
 ## Documentation
 

@@ -93,7 +93,8 @@
     vattrs <- vattrs[order(vattrs[[sort_col]], decreasing = TRUE), ]
   }
 
-  n <- min(top_n, nrow(vattrs))
+  total_nodes <- nrow(vattrs)
+  n <- min(top_n, total_nodes)
   vattrs <- utils::head(vattrs, n)
 
   name_col <- intersect(c("name", "node", "gene", "protein"), names(vattrs))[1]
@@ -107,8 +108,9 @@
     sprintf("%d. %s | %s", i, node, paste(metrics, collapse = " | "))
   }, character(1))
 
-  header <- sprintf("PPI network: %d nodes shown (top %d by %s)",
-                     nrow(vattrs), n, if (is.na(sort_col)) "order" else sort_col)
+  header <- sprintf("PPI network: %d nodes total; showing top %d by %s",
+                    total_nodes, n,
+                    if (is.na(sort_col)) "order" else sort_col)
   paste(c(header, lines), collapse = "\n")
 }
 
@@ -126,7 +128,8 @@
     stop("interpret_table() expects a data.frame.", call. = FALSE)
   }
 
-  n    <- min(top_n, nrow(x))
+  total_rows <- nrow(x)
+  n    <- min(top_n, total_rows)
   x    <- utils::head(x, n)
   cols <- names(x)
 
@@ -140,7 +143,7 @@
   }, character(1))
 
   header <- sprintf("Table: %d rows x %d cols, showing top %d",
-                    nrow(x), length(cols), n)
+                    total_rows, length(cols), n)
   paste(c(header, lines), collapse = "\n")
 }
 
@@ -269,7 +272,8 @@ interpret_enrichment <- function(x,
     context  = context,
     output   = extracted$output,
     metadata = .build_metadata(model, language, audience, input_class,
-                               output_mode = extracted$output_mode)
+                               output_mode = extracted$output_mode,
+                               generation_result = result)
   )
 }
 
@@ -326,7 +330,8 @@ interpret_ppi <- function(x,
     context  = context,
     output   = extracted$output,
     metadata = .build_metadata(model, language, audience, input_class,
-                               output_mode = extracted$output_mode)
+                               output_mode = extracted$output_mode,
+                               generation_result = result)
   )
 }
 
@@ -384,7 +389,8 @@ interpret_table <- function(x,
     context  = context,
     output   = extracted$output,
     metadata = .build_metadata(model, language, audience, input_class,
-                               output_mode = extracted$output_mode)
+                               output_mode = extracted$output_mode,
+                               generation_result = result)
   )
 }
 
@@ -632,7 +638,8 @@ tcm_interpret_schema <- function(x,
     output   = extracted$output,
     metadata = .build_metadata(model, language, audience,
                                paste(class(x), collapse = "/"),
-                               output_mode = extracted$output_mode),
+                               output_mode = extracted$output_mode,
+                               generation_result = result),
     schema   = schema
   )
 }
