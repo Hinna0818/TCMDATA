@@ -10,6 +10,7 @@ ggdock(
   type = "dot",
   point_size = 3,
   base_size = 7,
+  base_family = "Arial",
   angle = 50,
   hjust = 1,
   vjust = 1,
@@ -18,7 +19,7 @@ ggdock(
   label_digits = 2,
   label_size = 3,
   label_color = "black",
-  label_family = "sans",
+  label_family = base_family,
   label_fontface = "plain",
   ...
 )
@@ -33,6 +34,9 @@ ggdock(
 \item{point_size}{Numeric. Point size used in dot plots. Default is 3.}
 
 \item{base_size}{Numeric. Base font size for the theme. Default is 7.}
+
+\item{base_family}{Character. Font family used throughout the plot.
+Default is \code{"Arial"}.}
 
 \item{angle}{Numeric. Rotation angle for x-axis text labels. Default is 50.}
 
@@ -50,7 +54,8 @@ palette is used.}
 
 \item{label_color}{Character. Text color for affinity labels. Default \code{"black"}.}
 
-\item{label_family}{Character. Font family for labels (e.g., \code{"sans"}, \code{"Times"}). Default \code{"sans"}.}
+\item{label_family}{Character. Font family for labels. By default, follows
+\code{base_family}.}
 
 \item{label_fontface}{Character. Font face for labels: \code{"plain"}, \code{"bold"}, \code{"italic"}, \code{"bold.italic"}. Default \code{"plain"}.}
 

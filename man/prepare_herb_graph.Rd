@@ -40,13 +40,7 @@ lz <- search_herb(herb = herbs, type = "Herb_cn_name")[1:40, ]
 res <- prepare_herb_graph(lz)
 
 # visualization
-p <- ggtangle::ggplot(res, layout = "kk") +
- ggtangle::geom_edge(alpha = 0.4) +
- ggrepel::geom_text_repel(aes(label = name), size = 3.5, max.overlaps = 20) +
- geom_point(aes(color = type, size = centrality)) +
- scale_color_manual(values = c(
-   "Herb" = "#E41A1C", "Molecule" = "#377EB8", "Target" = "#4DAF4A")) +
- theme_void()
- print(p)
+p <- ggtcm_network(res, layout = "layered")
+print(p)
 
 }

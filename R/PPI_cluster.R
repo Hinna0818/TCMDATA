@@ -15,7 +15,7 @@
 #' cluster of size 1 are interpreted as background noise and grouped in one cluster. Default is FALSE.
 #' @importFrom igraph as_adjacency_matrix is_igraph V
 #' @importFrom stats setNames
-#' @return An igraph object containing MCL clustering labels.
+#' @return The graph with `MCL_cluster` and plot-ready `cluster` attributes.
 #'
 #' @examples
 #' library(igraph)
@@ -23,11 +23,12 @@
 #' g <- run_MCL(g, inflation = 2.5)
 #' print(head(V(g)$MCL_cluster))
 #'
-#' # Visualize
-#' plot(g,
-#' vertex.color = V(g)$MCL_cluster,
-#' vertex.size = 15,
-#' vertex.label = V(g)$name)
+#' # Visualize with the standardized TCMDATA network theme
+#' ggppi_network(
+#'   g,
+#'   cluster = "MCL_cluster",
+#'   show_text = FALSE
+#' )
 #'
 #' @export
 run_MCL <- function(g,
@@ -109,6 +110,11 @@ run_MCL <- function(g,
 
   # Assign to graph
   igraph::V(g)$MCL_cluster <- as.integer(final_clusters)
+  g <- .ppi_add_plot_attributes(
+    g,
+    cluster_attr = "MCL_cluster",
+    unassigned = 0
+  )
 
   return(g)
 }
@@ -127,7 +133,7 @@ run_MCL <- function(g,
 #'   If NULL (default), the function attempts to use the 'weight' or 'score' edge attribute.
 #'   Set to NA to perform unweighted clustering.
 #'
-#' @return The input \code{igraph} object with a new vertex attribute \code{louvain_cluster}.
+#' @return The graph with `louvain_cluster` and plot-ready `cluster` attributes.
 #' @importFrom igraph cluster_louvain V edge_attr_names E membership
 #'
 #' @examples
@@ -165,6 +171,7 @@ run_louvain <- function(g, resolution = 1.0, weights = NULL) {
 
   # Assign Cluster Labels
   igraph::V(g)$louvain_cluster <- as.factor(igraph::membership(louvain_res))
+  g <- .ppi_add_plot_attributes(g, cluster_attr = "louvain_cluster")
   num_clusters <- length(unique(igraph::membership(louvain_res)))
   modularity_score <- max(louvain_res$modularity, na.rm = TRUE)
 
@@ -187,7 +194,8 @@ run_louvain <- function(g, resolution = 1.0, weights = NULL) {
 #'   value is supplied, it is treated as the edge attribute name. Set to NA to
 #'   perform unweighted clustering.
 #'
-#' @return The input \code{igraph} object with a new vertex attribute \code{fastgreedy_cluster}.
+#' @return The graph with `fastgreedy_cluster` and plot-ready `cluster`
+#'   attributes.
 #' @importFrom igraph cluster_fast_greedy V edge_attr_names E membership ecount
 #'
 #' @examples
@@ -208,6 +216,7 @@ run_fastgreedy <- function(g, weights = NULL) {
   if (igraph::ecount(g) == 0) {
     warning("Graph has no edges. Assigning each node to its own fast greedy cluster.")
     igraph::V(g)$fastgreedy_cluster <- as.factor(seq_len(igraph::vcount(g)))
+    g <- .ppi_add_plot_attributes(g, cluster_attr = "fastgreedy_cluster")
     return(g)
   }
 
@@ -244,6 +253,7 @@ run_fastgreedy <- function(g, weights = NULL) {
   fg_res <- igraph::cluster_fast_greedy(g, weights = weights)
 
   igraph::V(g)$fastgreedy_cluster <- as.factor(igraph::membership(fg_res))
+  g <- .ppi_add_plot_attributes(g, cluster_attr = "fastgreedy_cluster")
   num_clusters <- length(unique(igraph::membership(fg_res)))
   modularity_score <- max(fg_res$modularity, na.rm = TRUE)
 

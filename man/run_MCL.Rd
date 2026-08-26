@@ -21,7 +21,7 @@ while saving memory. Default is 1e-5.}
 cluster of size 1 are interpreted as background noise and grouped in one cluster. Default is FALSE.}
 }
 \value{
-An igraph object containing MCL clustering labels.
+The graph with \code{MCL_cluster} and plot-ready \code{cluster} attributes.
 }
 \description{
 This function implements the Markov Clustering (MCL) algorithm for detecting
@@ -35,10 +35,11 @@ g <- make_graph("Zachary")
 g <- run_MCL(g, inflation = 2.5)
 print(head(V(g)$MCL_cluster))
 
-# Visualize
-plot(g,
-vertex.color = V(g)$MCL_cluster,
-vertex.size = 15,
-vertex.label = V(g)$name)
+# Visualize with the standardized TCMDATA network theme
+ggppi_network(
+  g,
+  cluster = "MCL_cluster",
+  show_text = FALSE
+)
 
 }

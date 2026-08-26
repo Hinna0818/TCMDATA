@@ -5,7 +5,9 @@
 #' @param top_n Integer. Number of top enriched terms to display. Default is 10.
 #' @param orderBy Character. Variable used to order the y-axis terms. Default is `"x"`.
 #' @param text.col Character. Colors for text. Default is `black`.
-#' @param text.size Numeric. Font size for axis text and title. Default is 8.
+#' @param text.size Numeric. Base font size for plot text. Default is 7.
+#' @param font.family Character. Font family used throughout the plot.
+#'   Default is `"Arial"`.
 #' @param text.width Numeric. Font width for axis text and title. Default is 35.
 #' @param palette Character. Color palette name from `RColorBrewer` to use for dot color. Default is `"RdBu"`.
 #' @param line.col Character. Color of the segment lines. Default is `"grey60"`.
@@ -29,7 +31,8 @@ gglollipop <- function(enrich_obj,
                                top_n = 10,
                                orderBy = NULL,
                                text.col = "black",
-                               text.size = 8,
+                               text.size = 7,
+                               font.family = "Arial",
                                text.width = 35,
                                palette = "RdBu",
                                line.col = "grey60",
@@ -39,6 +42,7 @@ gglollipop <- function(enrich_obj,
                                show_count = TRUE,
                                ...) {
 
+  font.family <- .resolve_tcm_font_family(font.family)
   if (!requireNamespace("RColorBrewer", quietly = TRUE)) {
     stop("Package 'RColorBrewer' is required for gglollipop(). Please install it with: install.packages('RColorBrewer')")
   }
@@ -81,9 +85,11 @@ gglollipop <- function(enrich_obj,
     p <- p + geom_text_repel(data = df_plot,
               aes(x = .data[[x]],
                   y = .data[["Description"]],
-                  label = .data[["Count"]]),
+              label = .data[["Count"]]),
               size = text.size / 2,
               color = text.col,
+              family = font.family,
+              fontface = "plain",
               hjust = 0,
               direction = "x",
               nudge_x = 0.025 * max(df_plot[[x]], na.rm = TRUE),
@@ -92,12 +98,13 @@ gglollipop <- function(enrich_obj,
   }
 
   p <- p +
-    theme_bw() +
+    .theme_tcm_pub(
+      base_size = text.size,
+      base_family = font.family,
+      grid = "none"
+    ) +
     theme(
-      axis.text.x = element_text(size = text.size),
-      axis.text.y = element_text(size = text.size),
-      axis.title = element_text(size = text.size + 1),
-      plot.title = element_text(size = text.size + 2, face = "bold", hjust = 0.5)
+      plot.title = element_text(hjust = 0.5, face = "plain")
     ) +
     ggtitle(plot_title)
 

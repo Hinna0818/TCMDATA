@@ -17,14 +17,17 @@ Description: A comprehensive R package for Traditional Chinese Medicine (TCM)
     publication-ready visualizations including Sankey diagrams, docking
     heatmaps, and lollipop plots.
 Depends:
-    R (>= 4.1.0)
+    R (>= 4.5.0)
 Imports:
+    aplot,
     clusterProfiler,
     dplyr,
     enrichplot,
     ggfun,
     ggplot2,
     ggrepel,
+    ggtangle,
+    ggtree,
     grDevices,
     igraph,
     jsonlite,
@@ -33,13 +36,14 @@ Imports:
     purrr,
     rlang,
     scales,
+    shiny,
     stats,
     tibble,
     tidyr,
     utils,
+    visNetwork,
     yulab.utils
 Suggests:
-    aplot,
     aplotExtra,
     forcats,
     Matrix,
@@ -61,10 +65,10 @@ Suggests:
     xml2,
     rcdk,
     webchem,
-    ggtangle,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0),
+    WGCNA,
     ggalluvial,
     ggvenn,
     ggthemes,

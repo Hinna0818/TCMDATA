@@ -139,7 +139,7 @@ make_colors <- function(items, colors, insert = NULL) {
 #' @param id_y_pos Numeric constant controlling the y-position of “Gene” strata in the Sankey diagram. Default is `1.1`.
 #' @param desc_y_pos Numeric constant controlling the y-position of “Pathway” strata in the Sankey diagram. Default is `1.0`.
 #' @param pathway_wrap Integer. The maximum line width for pathway label wrapping. Default is `50`.
-#' @param sankey_text_size Numeric. Font size for text labels in the Sankey diagram. Default is `4`.
+#' @param sankey_text_size Numeric. Font size for text labels in the Sankey diagram. Default is `2.5`.
 #' @param bubble_size_range Numeric vector of length 2. Range of point sizes in the dot plot. Default is `c(3, 8)`.
 #' @param dot_palette Character. Name of the RColorBrewer palette used for color gradients in the dot plot. Default is `"RdBu"`.
 #' @param dot_x_var Character. Variable used for the x-axis in the dot plot.
@@ -147,8 +147,9 @@ make_colors <- function(items, colors, insert = NULL) {
 #' @param sankey_width Numeric. Relative width of the Sankey panel in the combined plot. Default is `2`.
 #' @param dot_width Numeric. Relative width of the dot plot panel in the combined plot. Default is `1`.
 #' @param font_family Character. Font family for all text elements. Default is `"Arial"`.
-#' @param font_face Character. Font face for all text. Default is `"plain"`.
-#' @param gene_fontface Character. Font face for gene labels (rightmost axis). Default is `"italic"`.
+#' @param font_face Character. Font face for Sankey labels. Default is `"plain"`.
+#' @param gene_fontface Character. Font face for gene labels (rightmost axis). Default is `"plain"`.
+#' @param base_size Numeric. Base font size for axes and legends. Default is `7`.
 #' @param sankey_lab Character. Label for the x-axis of the Sankey diagram. Default is `"Gene-Pathway"`.
 #' @param seed Integer. Random seed for reproducibility of layout. Default is `2025`.
 #' @param ... Additional arguments passed to internal helper functions.
@@ -175,20 +176,22 @@ ggdot_sankey <- function(
     id_y_pos = 1.1,
     desc_y_pos = 1.0,
     pathway_wrap = 50,
-    sankey_text_size = 4,
+    sankey_text_size = 2.5,
     bubble_size_range = c(3, 8),
     dot_palette = "RdBu",
     dot_x_var = c("GeneRatio", "RichFactor", "FoldEnrichment"),
     bubble_p_label = "p.adjust",
     sankey_width = 2,
     dot_width = 1,
-    font_family = "sans",
+    font_family = "Arial",
     font_face = "plain",
-    gene_fontface = "italic",
+    gene_fontface = "plain",
+    base_size = 7,
     sankey_lab = "Gene-Pathway",
     seed = 2025,
     ...){
 
+  font_family <- .resolve_tcm_font_family(font_family)
   if (!requireNamespace("ggalluvial", quietly = TRUE)) {
     stop("Package 'ggalluvial' is required for ggdot_sankey(). Please install it.")
   }
@@ -240,9 +243,6 @@ ggdot_sankey <- function(
     mutate(flow_color = .data$node_color)
 
   ## 4. sankey plot
-  base_theme <- theme(text = element_text(family = font_family, face = font_face),
-                      plot.margin = unit(c(0, 0, 0, 0), "cm"))
-
   sankeyPlot <- ggplot(
     data = sankeyData,
     aes(x = .data$axis, stratum = .data$stratum, alluvium = .data$alluvium, y = .data$y_pos)
@@ -271,10 +271,12 @@ ggdot_sankey <- function(
     scale_x_discrete(expand = c(0, 0)) +
     scale_fill_identity() +
     guides(fill = "none") +
-    theme_void() +
-    base_theme +
+    .theme_tcm_void(base_size = base_size, base_family = font_family) +
     labs(x = sankey_lab) +
-    theme(axis.title.x = element_text(margin = margin(t = 6), size = 16))
+    theme(
+      axis.title.x = element_text(margin = margin(t = 6), face = "plain"),
+      plot.margin = margin(0, 0, 0, 0, "cm")
+    )
 
   ## 5. dot plot
   # extract plot data
@@ -322,15 +324,18 @@ ggdot_sankey <- function(
       x = bubble_x_label,
       y = NULL
     ) +
-    theme_bw() + base_theme +
+    .theme_tcm_pub(
+      base_size = base_size,
+      base_family = font_family,
+      grid = "none"
+    ) +
     theme(
       axis.text.y = element_blank(),
       axis.ticks.y = element_blank(),
       axis.title.y = element_blank(),
       panel.border = element_blank(),
-      panel.grid = element_blank(),
-      axis.text.x = element_text(margin = margin(t = 4), size = 12),
-      axis.title.x = element_text(margin = margin(t = 6), size = 16))
+      axis.text.x = element_text(margin = margin(t = 4)),
+      axis.title.x = element_text(margin = margin(t = 6), face = "plain"))
 
   ## combine dot plot and sankey plot
   yRange <- sankeyPlotData$layout$panel_params[[1]]$y.range

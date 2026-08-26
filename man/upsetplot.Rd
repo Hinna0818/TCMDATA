@@ -11,7 +11,9 @@ upsetplot(
   order.set.by = c("size", "name"),
   color.intersect.by = "none",
   color.set.by = "none",
-  remove_empty_intersects = TRUE
+  remove_empty_intersects = TRUE,
+  base_size = 7,
+  base_family = "Arial"
 )
 }
 \arguments{
@@ -28,6 +30,11 @@ upsetplot(
 \item{color.set.by}{Color scheme for set bars.}
 
 \item{remove_empty_intersects}{Whether to remove empty intersections.}
+
+\item{base_size}{Base font size. Default is 7.}
+
+\item{base_family}{Font family used throughout the plot. Default is
+\code{"Arial"}.}
 }
 \value{
 An UpSet plot object returned by \code{aplotExtra}.

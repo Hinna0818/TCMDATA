@@ -11,6 +11,9 @@
 #' @param label.size Numeric. Font size for count labels on bars. Default is 3.2.
 #' @param show_count Logical. Whether to show count labels on bars. Default is TRUE.
 #' @param label.bold Logical. Whether count labels should be bold. Default is FALSE.
+#' @param base_size Numeric. Base font size. Default is 7.
+#' @param base_family Character. Font family used throughout the plot.
+#'   Default is `"Arial"`.
 #' @param x.angle Numeric. Rotation angle of x-axis text (pathway descriptions). Default is 60.
 #' @param legend.position Character. Position of the legend. Default is "top".
 #' @param plot_title Character or NULL. Title of the plot. Default is NULL.
@@ -49,11 +52,14 @@ go_barplot <- function(enrich_obj,
                        label.size = 3.2,
                        show_count = TRUE,
                        label.bold = FALSE,
+                       base_size = 7,
+                       base_family = "Arial",
                        x.angle = 60,
                        legend.position = "top",
                        plot_title = NULL,
                        ...) {
 
+  base_family <- .resolve_tcm_font_family(base_family)
   # Check input
   if (!inherits(enrich_obj, "enrichResult")) {
     stop("enrich_obj must be an enrichResult object", call. = FALSE)
@@ -114,12 +120,18 @@ go_barplot <- function(enrich_obj,
       aes(label = .data[[xcol]]),
       vjust = -0.3,
       size = label.size,
+      family = base_family,
       fontface = if (label.bold) "bold" else "plain"
     )
   }
 
   # update layout
   p <- p +
+    .theme_tcm_pub(
+      base_size = base_size,
+      base_family = base_family,
+      grid = "none"
+    ) +
     theme(
       axis.text.x = element_text(angle = x.angle, hjust = 1, vjust = 1,
                                  color = label_colors, face  = if (label.bold) "bold" else "plain"),

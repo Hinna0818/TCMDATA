@@ -16,7 +16,7 @@ If NULL (default), the function attempts to use the 'weight' or 'score' edge att
 Set to NA to perform unweighted clustering.}
 }
 \value{
-The input \code{igraph} object with a new vertex attribute \code{louvain_cluster}.
+The graph with \code{louvain_cluster} and plot-ready \code{cluster} attributes.
 }
 \description{
 This function performs Louvain clustering (multi-level modularity optimization)

@@ -16,8 +16,8 @@ tcm_sankey(
     "#E6D48A", "#B85C5C", "#D8A24A", "#E15759"),
   plot_font = "Arial",
   font_face = "plain",
-  target_fontface = "italic",
-  font_size = 2.2,
+  target_fontface = "plain",
+  font_size = 2.5,
   width = 0.05,
   alpha = 0.3,
   knot.pos = 0.3
@@ -36,13 +36,13 @@ TCM_sankey(...)
 
 \item{target_cols}{Character vector defining the base color palette for the target.}
 
-\item{plot_font}{Character string specifying the font family used for text. Default is \code{"sans"}.}
+\item{plot_font}{Character string specifying the font family used for text. Default is \code{"Arial"}.}
 
 \item{font_face}{Character string specifying the font face. Default is \code{"plain"}.}
 
-\item{target_fontface}{Character string specifying the font face for target labels (rightmost axis). Default is \code{"italic"}.}
+\item{target_fontface}{Character string specifying the font face for target labels (rightmost axis). Default is \code{"plain"}.}
 
-\item{font_size}{Numeric value controlling the size of node labels. Default is \code{3.5}.}
+\item{font_size}{Numeric value controlling the size of node labels. Default is \code{2.5}.}
 
 \item{width}{Numeric value controlling the width of both nodes and flows. Default is \code{0.05}.}
 
