@@ -331,18 +331,43 @@ p_box <- plot_gene_boxplot(genes = consensus$gene[1:4], expr_mat = expr, group =
 
 ### Setup
 
-Use `tcm_setup()` for model configuration. Set `skip_internet_check = TRUE` in proxy or TUN environments when endpoint checks pass but `curl::has_internet()` misfires.
+Use `tcm_setup()` for model configuration. OpenAI, Anthropic, and Gemini are provided by `aisdk`; DeepSeek and other additional providers require `aisdk.providers`.
 
 ```r
+# Official OpenAI API
 tcm_setup(
   provider = "openai",
   api_key = Sys.getenv("OPENAI_API_KEY"),
-  model = "gpt-5.4-mini",
-  base_url = "https://www.packyapi.com/v1",
-  save = TRUE,
-  test = TRUE
+  model = "gpt-5-mini",
+  save = TRUE
+)
+
+# Official Anthropic API
+tcm_setup(
+  provider = "anthropic",
+  api_key = Sys.getenv("ANTHROPIC_API_KEY"),
+  model = "claude-sonnet-4-20250514"
+)
+
+# Official DeepSeek API; clear stale relay settings first
+Sys.setenv(DEEPSEEK_BASE_URL = "https://api.deepseek.com")
+tcm_setup(
+  provider = "deepseek",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  model = "deepseek-chat"
+)
+
+# OpenAI Chat Completions-compatible relay serving a Claude model
+tcm_setup(
+  provider = "anthropic",
+  api_key = Sys.getenv("RELAY_API_KEY"),
+  model = "relay-claude-model-id",
+  base_url = "https://relay.example.com/v1",
+  api_format = "chat_completions"
 )
 ```
+
+For relays, use the exact model ID and API root supplied by the service. Select `api_format = "anthropic_messages"` for a native Anthropic relay or `api_format = "responses"` for an OpenAI Responses relay. Set `supports_native_tools = FALSE` if the relay rejects native tool calls, and use `tcm_chat(stream = FALSE)` if streaming is unsupported.
 
 ### Interpretation layer
 

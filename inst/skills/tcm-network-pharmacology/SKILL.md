@@ -22,6 +22,7 @@ Use this skill as an execution guide for TCMDATA-based network pharmacology task
 3. Prefer TCMDATA functions and built-in agent tools over ad hoc code.
 4. Preserve object names requested by the user, especially plot names such as `p_kegg`.
 5. Report exact counts, thresholds, and artifact IDs from tool outputs. Never invent genes, terms, p-values, pathways, or evidence.
+6. For a plot request, use the appropriate plotting tool and return a plot artifact. Confirm that the plot is available in `.GlobalEnv` under the returned artifact ID and report that name.
 
 ## Reference Files
 

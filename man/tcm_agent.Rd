@@ -21,6 +21,9 @@ A list with text response, artifacts, and tool call log.
 \description{
 The main entry point for natural language TCM analysis. Automatically
 routes the task, creates appropriate agent, and executes the task.
+Tool-generated artifacts are exported to \code{.GlobalEnv}. For explicit
+visualization requests, the agent is instructed to create a plot artifact
+and report the exported object name.
 }
 \examples{
 \dontrun{

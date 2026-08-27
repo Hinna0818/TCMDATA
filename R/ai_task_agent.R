@@ -6,6 +6,8 @@
 #'
 #' Creates an aisdk agent configured for TCM network pharmacology analysis.
 #' The agent can call TCMDATA tools natively.
+#' Plot requests are handled through plotting tools; generated plot artifacts
+#' are exported to \code{.GlobalEnv} under their artifact IDs.
 #'
 #' @param tools List of Tool objects. If NULL, uses default tools from
 #'   \code{\link{create_tcm_tools}}.
@@ -43,6 +45,11 @@ create_tcm_task_agent <- function(tools = NULL, system_prompt = NULL,
     creator_skill <- tryCatch(tcm_aisdk_skill(), error = function(e) NULL)
     skill_paths <- unique(c(tcm_skill_dir(), creator_skill))
   }
+  # aisdk >= 1.5 treats character(0) as a path and attempts to scan it.
+  # Passing NULL is the supported representation for disabling skills.
+  if (length(skill_paths) == 0L) {
+    skill_paths <- NULL
+  }
 
   aisdk::create_agent(
     name = "TCMTaskAgent",
@@ -65,7 +72,9 @@ create_tcm_task_agent <- function(tools = NULL, system_prompt = NULL,
 #' @return A list with:
 #'   \item{text}{The agent's final response text.}
 #'   \item{artifacts}{List of artifact handles created during execution.}
-#'   \item{tool_calls}{Log of tool calls made.}
+#'   \item{tool_calls}{Complete tool-call log across all agent steps.}
+#'   \item{steps}{Number of agent steps, when reported by aisdk.}
+#'   \item{generation_result}{The complete aisdk generation result.}
 #'
 #' @examples
 #' \dontrun{
@@ -110,9 +119,11 @@ run_tcm_task <- function(agent, task, model = NULL, verbose = TRUE) {
   }
 
   invisible(list(
-    text       = result$text,
-    artifacts  = artifacts,
-    tool_calls = result$tool_calls %||% list()
+    text              = result$text,
+    artifacts         = artifacts,
+    tool_calls        = .tcm_result_tool_calls(result),
+    steps             = result$steps %||% NULL,
+    generation_result = result
   ))
 }
 
@@ -120,6 +131,9 @@ run_tcm_task <- function(agent, task, model = NULL, verbose = TRUE) {
 #'
 #' The main entry point for natural language TCM analysis. Automatically
 #' routes the task, creates appropriate agent, and executes the task.
+#' Tool-generated artifacts are exported to \code{.GlobalEnv}. For explicit
+#' visualization requests, the agent is instructed to create a plot artifact
+#' and report the exported object name.
 #'
 #' @param task Character. Natural language task description.
 #' @param model Model object or NULL (uses package default).
@@ -188,6 +202,11 @@ tcm_agent <- function(task,
 #'
 #' The session automatically routes each task to the appropriate tool set,
 #' so users do not need to call individual functions.
+#' Plot requests create plot artifacts that are exported to \code{.GlobalEnv}
+#' under their artifact IDs for direct inspection in RStudio.
+#' After every turn that executes one or more tools, TCMDATA also exports a
+#' reproducible replay script to \code{.GlobalEnv} as
+#' \code{tcm_script_001}, \code{tcm_script_002}, and so on.
 #'
 #' Built-in commands (type directly at the prompt):
 #' \itemize{
@@ -212,10 +231,12 @@ tcm_agent <- function(task,
 #'   paths, for example \code{c(tcm_skill_dir(), tcm_aisdk_skill())}, to enable
 #'   skill loading.
 #'
-#' @return Invisibly returns a list with \code{history} (each turn's task and
-#'   reply) and \code{artifacts} (a data.frame snapshot from
-#'   \code{\link{list_tcm_artifacts}}). Assign the result to keep the full
-#'   session record: \code{res <- tcm_chat()}.
+#' @return Invisibly returns a list with \code{history} (each turn's task,
+#'   reply, tool calls, and script name), \code{artifacts} (a data.frame snapshot from
+#'   \code{\link{list_tcm_artifacts}}), and \code{tool_calls} (the complete
+#'   session tool-call trajectory). The \code{scripts} element contains the
+#'   names of replay-script objects exported during the session. Assign the
+#'   result to keep the full session record: \code{res <- tcm_chat()}.
 #'
 #' @examples
 #' \dontrun{
@@ -236,6 +257,8 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
   history <- list()
   last_result <- NULL
   total_tools_used <- 0L
+  session_tool_calls <- list()
+  session_scripts <- character(0)
   session_start <- Sys.time()
   workflow_log <- character(0)
 
@@ -350,6 +373,9 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
           reply_preview <- substr(h$reply, 1, 80)
           if (nchar(h$reply) > 80) reply_preview <- paste0(reply_preview, "...")
           cat(sprintf("       Agent: %s\n", reply_preview))
+          if (!is.null(h$script)) {
+            cat(sprintf("       Script: %s\n", h$script))
+          }
         }
       }
       cat(ruler(), "\n\n")
@@ -465,6 +491,7 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
       cat(sprintf("  Turns:          %d\n", turn))
       cat(sprintf("  Tool calls:     %d\n", total_tools_used))
       cat(sprintf("  Artifacts:      %d\n", art_count))
+      cat(sprintf("  Scripts:        %d\n", length(session_scripts)))
       cat(sprintf("  Duration:       %.1f min\n", elapsed))
       cat(sprintf("  Model:          %s\n", model_id))
       cat(ruler(), "\n\n")
@@ -487,6 +514,7 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
     # -- Agent turn --
     turn <- turn + 1L
     arts_before <- nrow(list_tcm_artifacts())
+    script_name <- NULL
 
     cat("\n")
     cat(cyan_text(ruler("\u2504")), "\n")
@@ -552,7 +580,16 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
       }
 
       # Tool call log
-      tool_calls <- result$tool_calls %||% list()
+      tool_calls <- .tcm_result_tool_calls(result)
+      if (length(tool_calls) > 0L) {
+        turn_calls <- lapply(tool_calls, function(call) {
+          if (is.list(call)) {
+            call$turn <- turn
+          }
+          call
+        })
+        session_tool_calls <- c(session_tool_calls, turn_calls)
+      }
       total_tools_used <- total_tools_used + length(tool_calls)
       if (length(tool_calls) > 0) {
         cat(dim_text(paste0("  Tools: ",
@@ -576,6 +613,33 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
         cat(yellow_text(paste0("  + ", new_count, " artifact(s)  (total: ",
                              arts_after, ")  [exported: ",
                              paste(new_ids, collapse = ", "), "]")), "\n")
+      }
+
+      # Preserve the exact executed tool sequence as a replayable R script.
+      if (length(tool_calls) > 0L) {
+        script_export <- tryCatch({
+          script <- .build_tcm_analysis_script(
+            result = result,
+            task = task,
+            turn = turn,
+            model = model_id
+          )
+          list(name = .export_tcm_analysis_script(script), error = NULL)
+        }, error = function(e) {
+          list(name = NULL, error = conditionMessage(e))
+        })
+        script_name <- script_export$name
+        if (!is.null(script_name)) {
+          session_scripts <- c(session_scripts, script_name)
+          cat(dim_text(sprintf(
+            "  Script: %s  [exported to .GlobalEnv]",
+            script_name
+          )), "\n")
+        } else if (!is.null(script_export$error)) {
+          cat(yellow_text(paste0(
+            "  [script export failed: ", script_export$error, "]"
+          )), "\n")
+        }
       }
 
       cat(cyan_text(ruler("\u2504")), "\n")
@@ -660,9 +724,11 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
 
       last_result <- result
       history[[length(history) + 1L]] <- list(
-        turn  = turn,
-        task  = task,
-        reply = result$text
+        turn       = turn,
+        task       = task,
+        reply      = result$text,
+        tool_calls = tool_calls,
+        script     = script_name
       )
 
     }, error = function(e) {
@@ -678,8 +744,10 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
   }
 
   invisible(list(
-    history   = history,
-    artifacts = list_tcm_artifacts()
+    history    = history,
+    artifacts  = list_tcm_artifacts(),
+    tool_calls = session_tool_calls,
+    scripts    = session_scripts
   ))
 }
 
@@ -709,9 +777,10 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
   }
 
   stream_buf <- character(0)
+  stream_result <- NULL
   stream_error <- NULL
   tryCatch(
-    chat_session$send_stream(
+    stream_result <- chat_session$send_stream(
       prompt = prompt,
       turn_system_prompt = turn_ctx,
       temperature = NULL,
@@ -750,17 +819,24 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
     ))
   }
 
-  response_text <- chat_session$get_last_response()
-  if (is.null(response_text) || !nzchar(response_text)) {
-    response_text <- paste0(stream_buf, collapse = "")
+  if (is.null(stream_result)) {
+    response_text <- chat_session$get_last_response()
+    if (is.null(response_text) || !nzchar(response_text)) {
+      response_text <- paste0(stream_buf, collapse = "")
+    }
+    stream_result <- list(text = response_text, tool_calls = list())
   }
 
   list(
-    result       = list(text = response_text, tool_calls = list()),
+    result       = stream_result,
     chat_session = chat_session,
     streamed     = TRUE,
     fallback     = FALSE
   )
+}
+
+.tcm_result_tool_calls <- function(result) {
+  result$all_tool_calls %||% result$tool_calls %||% list()
 }
 
 #' Default system prompt for TCM task agent
@@ -808,6 +884,8 @@ tcm_chat <- function(model = NULL, verbose = TRUE, stream = TRUE,
     "<tool_use_guidelines>",
     "- Call tools directly instead of suggesting R code for the user to run.",
     "- When a tool returns an artifact_id, reuse it in subsequent tool calls to build on previous results.",
+    "- PLOT OUTPUT RULE: when the user asks for a plot, call the appropriate plotting tool and create a plot artifact; do not only describe a plot or return plotting code.",
+    "- Plot artifacts must be exported to .GlobalEnv under their artifact IDs. Report the returned global_name (or artifact_id) so the user can inspect the plot directly.",
     "- Use the provided tools and ground your responses in their outputs. Cite specific numbers from tool results.",
     "- Prefer incremental steps over skipping ahead. Each tool call should produce a verifiable intermediate result.",
     "</tool_use_guidelines>",
@@ -867,63 +945,180 @@ create_tcm_workflow <- function(name, steps) {
 #' @param ... Named parameters to substitute into step definitions.
 #' @param verbose Logical. Print progress (default TRUE).
 #'
-#' @return A list of step results.
+#' @return A \code{tcm_workflow_result} list. Step results remain available by
+#'   position for backward compatibility. The complete execution trace is
+#'   stored in the \code{tool_calls} attribute.
 #' @export
 run_tcm_workflow <- function(workflow, ..., verbose = TRUE) {
+  if (!inherits(workflow, "tcm_workflow")) {
+    stop("`workflow` must be created by create_tcm_workflow().", call. = FALSE)
+  }
+
   params <- list(...)
   results <- list()
+  tool_calls <- list()
   previous_result <- NULL
+  run_started_at <- Sys.time()
+  run_id <- sprintf(
+    "%s_%s",
+    gsub("[^A-Za-z0-9_-]", "_", workflow$name),
+    format(run_started_at, "%Y%m%dT%H%M%OS6")
+  )
+  tools <- create_tcm_tools()
+  workflow_status <- "completed"
 
   for (i in seq_along(workflow$steps)) {
     step <- workflow$steps[[i]]
+    step_started_at <- Sys.time()
+    step_params <- NULL
     if (verbose) {
       message(sprintf("Step %d: %s", i, step$tool))
     }
 
-    # Resolve parameters
-    step_params <- step$params
-    for (pname in names(step_params)) {
-      pval <- step_params[[pname]]
-      if (is.character(pval)) {
-        # Substitute {{param_name}}
-        for (key in names(params)) {
-          pval <- gsub(sprintf("\\{\\{%s\\}\\}", key), params[[key]], pval)
-        }
-        # Substitute {{from_previous}}
-        if (grepl("\\{\\{from_previous\\}\\}", pval) && !is.null(previous_result)) {
-          # Try to get artifact_id or genes from previous result
-          if (!is.null(previous_result$artifact_id)) {
-            pval <- gsub("\\{\\{from_previous\\}\\}", previous_result$artifact_id, pval)
-          }
-        }
-        step_params[[pname]] <- pval
-      }
-    }
-
-    # Execute tool
-    tools <- create_tcm_tools()
-    tool <- Filter(function(t) t$name == step$tool, tools)
-    if (length(tool) == 0) {
-      stop(sprintf("Tool '%s' not found.", step$tool))
-    }
-    tool <- tool[[1]]
-
     result <- tryCatch({
-      do.call(tool$execute, step_params)
+      step_params <- .resolve_workflow_value(
+        step$params %||% list(),
+        params = params,
+        previous_result = previous_result
+      )
+
+      tool <- Filter(function(x) identical(x$name, step$tool), tools)
+      if (length(tool) == 0L) {
+        stop(sprintf("Tool '%s' not found.", step$tool), call. = FALSE)
+      }
+
+      # aisdk >= 1.5 validates and executes tools through the public run method.
+      tool[[1]]$run(step_params)
     }, error = function(e) {
-      list(ok = FALSE, error = conditionMessage(e))
+      list(
+        ok = FALSE,
+        error = conditionMessage(e),
+        error_class = class(e)[[1L]]
+      )
     })
 
+    step_completed_at <- Sys.time()
+    step_ok <- if (is.list(result) && !is.null(result$ok)) {
+      isTRUE(result$ok)
+    } else {
+      TRUE
+    }
+
     results[[i]] <- result
+    tool_calls[[i]] <- list(
+      call_id = sprintf("%s_step_%03d", run_id, i),
+      step = i,
+      tool = step$tool,
+      arguments = step_params,
+      result = result,
+      status = if (step_ok) "completed" else "failed",
+      started_at = step_started_at,
+      completed_at = step_completed_at,
+      duration_seconds = as.numeric(difftime(
+        step_completed_at,
+        step_started_at,
+        units = "secs"
+      ))
+    )
     previous_result <- result
 
-    if (!isTRUE(result$ok)) {
+    if (!step_ok) {
+      workflow_status <- "failed"
       warning(sprintf("Step %d failed: %s", i, result$error %||% "unknown error"))
       break
     }
   }
 
-  results
+  run_completed_at <- Sys.time()
+  structure(
+    results,
+    class = c("tcm_workflow_result", "list"),
+    workflow_name = workflow$name,
+    run_id = run_id,
+    status = workflow_status,
+    inputs = params,
+    tool_calls = tool_calls,
+    started_at = run_started_at,
+    completed_at = run_completed_at,
+    duration_seconds = as.numeric(difftime(
+      run_completed_at,
+      run_started_at,
+      units = "secs"
+    ))
+  )
+}
+
+.resolve_workflow_value <- function(value, params, previous_result) {
+  if (is.list(value)) {
+    return(lapply(
+      value,
+      .resolve_workflow_value,
+      params = params,
+      previous_result = previous_result
+    ))
+  }
+  if (!is.character(value)) {
+    return(value)
+  }
+
+  previous_value <- .workflow_previous_value(previous_result)
+  resolve_key <- function(key) {
+    if (identical(key, "from_previous")) {
+      return(previous_value)
+    }
+    if (key %in% names(params)) {
+      return(params[[key]])
+    }
+    NULL
+  }
+
+  if (length(value) == 1L) {
+    exact_match <- regexec("^\\{\\{([^{}]+)\\}\\}$", value)
+    exact_parts <- regmatches(value, exact_match)[[1L]]
+    if (length(exact_parts) == 2L) {
+      resolved <- resolve_key(exact_parts[[2L]])
+      if (!is.null(resolved)) {
+        return(resolved)
+      }
+    }
+  }
+
+  vapply(value, function(item) {
+    matches <- gregexpr("\\{\\{([^{}]+)\\}\\}", item, perl = TRUE)
+    tokens <- regmatches(item, matches)[[1L]]
+    if (identical(tokens, character(0))) {
+      return(item)
+    }
+
+    for (token in unique(tokens)) {
+      key <- sub("^\\{\\{", "", sub("\\}\\}$", "", token))
+      replacement <- resolve_key(key)
+      if (is.null(replacement)) {
+        next
+      }
+      if (length(replacement) != 1L || !is.atomic(replacement)) {
+        stop(sprintf(
+          "Workflow placeholder '%s' must resolve to a scalar when embedded in text.",
+          token
+        ), call. = FALSE)
+      }
+      item <- gsub(token, as.character(replacement), item, fixed = TRUE)
+    }
+    item
+  }, character(1), USE.NAMES = FALSE)
+}
+
+.workflow_previous_value <- function(previous_result) {
+  if (!is.list(previous_result)) {
+    return(NULL)
+  }
+  if (!is.null(previous_result$artifact_id)) {
+    return(previous_result$artifact_id)
+  }
+  if (!is.null(previous_result$genes)) {
+    return(previous_result$genes)
+  }
+  NULL
 }
 
 #' Print method for TCM workflow

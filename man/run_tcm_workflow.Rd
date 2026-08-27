@@ -14,7 +14,9 @@ run_tcm_workflow(workflow, ..., verbose = TRUE)
 \item{verbose}{Logical. Print progress (default TRUE).}
 }
 \value{
-A list of step results.
+A \code{tcm_workflow_result} list. Step results remain available by
+position for backward compatibility. The complete execution trace is
+stored in the \code{tool_calls} attribute.
 }
 \description{
 Executes a predefined workflow step by step.

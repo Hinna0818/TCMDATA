@@ -23,6 +23,8 @@ An aisdk Agent object.
 \description{
 Creates an aisdk agent configured for TCM network pharmacology analysis.
 The agent can call TCMDATA tools natively.
+Plot requests are handled through plotting tools; generated plot artifacts
+are exported to \code{.GlobalEnv} under their artifact IDs.
 }
 \examples{
 \dontrun{

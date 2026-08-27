@@ -96,6 +96,7 @@ draft_result_paragraph <- function(
     metadata = .build_metadata(model, language,
                                audience = "paper",
                                input_class,
-                               output_mode = extracted$output_mode)
+                               output_mode = extracted$output_mode,
+                               generation_result = result)
   )
 }

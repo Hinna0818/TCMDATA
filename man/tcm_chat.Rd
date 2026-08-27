@@ -21,10 +21,12 @@ paths, for example \code{c(tcm_skill_dir(), tcm_aisdk_skill())}, to enable
 skill loading.}
 }
 \value{
-Invisibly returns a list with \code{history} (each turn's task and
-reply) and \code{artifacts} (a data.frame snapshot from
-\code{\link{list_tcm_artifacts}}). Assign the result to keep the full
-session record: \code{res <- tcm_chat()}.
+Invisibly returns a list with \code{history} (each turn's task,
+reply, tool calls, and script name), \code{artifacts} (a data.frame snapshot from
+\code{\link{list_tcm_artifacts}}), and \code{tool_calls} (the complete
+session tool-call trajectory). The \code{scripts} element contains the
+names of replay-script objects exported during the session. Assign the
+result to keep the full session record: \code{res <- tcm_chat()}.
 }
 \description{
 Starts a rich interactive chat session for multi-turn TCM analysis
@@ -35,6 +37,11 @@ updates, and the agent response.
 \details{
 The session automatically routes each task to the appropriate tool set,
 so users do not need to call individual functions.
+Plot requests create plot artifacts that are exported to \code{.GlobalEnv}
+under their artifact IDs for direct inspection in RStudio.
+After every turn that executes one or more tools, TCMDATA also exports a
+reproducible replay script to \code{.GlobalEnv} as
+\code{tcm_script_001}, \code{tcm_script_002}, and so on.
 
 Built-in commands (type directly at the prompt):
 \itemize{

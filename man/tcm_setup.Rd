@@ -13,7 +13,11 @@ tcm_setup(
   save = FALSE,
   test = FALSE,
   force_json_schema = TRUE,
-  skip_internet_check = TRUE
+  skip_internet_check = TRUE,
+  api_format = NULL,
+  supports_native_tools = NULL,
+  disable_stream_options = NULL,
+  responses_state_mode = NULL
 )
 }
 \arguments{
@@ -37,28 +41,41 @@ verify the API key and endpoint are reachable. Warnings (not errors) are
 issued on failure so the model is still registered. Default FALSE.}
 
 \item{force_json_schema}{Logical. Default \code{TRUE}. When \code{TRUE},
-every \code{generate_object()} call internally re-passes the output schema
-as \code{response_format}, which (a) enables native JSON schema output on
-models that support the OpenAI structured-output API and (b) forces
-OpenAI-compatible \strong{proxies} to preserve the system message that
-contains the schema instruction (some 3rd-party relay APIs silently strip
-the system message when \code{response_format} is absent).
-Set \code{FALSE} only when targeting a provider whose API rejects an
-unknown \code{response_format} field entirely.}
+the schema is also passed as \code{response_format} when structured output
+must use JSON mode. With native tool support, TCMDATA uses the aisdk 1.5
+forced-tool structured-output mode and this option has no effect. Set
+\code{FALSE} only when a JSON-only relay rejects \code{response_format}.}
 
 \item{skip_internet_check}{Logical. Default \code{TRUE}. Sets
 \code{options(aisdk.skip_internet_check = TRUE)} before live requests so
 \code{curl::has_internet()} false negatives in proxy/VPN environments do
 not block otherwise reachable API endpoints.}
+
+\item{api_format}{Character or NULL. API protocol for a custom
+\code{base_url}. Supported values are \code{"chat_completions"},
+\code{"responses"}, and \code{"anthropic_messages"}; common aliases
+\code{"chat"} and \code{"anthropic"} are accepted. NULL selects the
+provider-specific default.}
+
+\item{supports_native_tools}{Logical or NULL. Whether a relay endpoint
+accepts native tool calls. Defaults to TRUE for relay endpoints; set FALSE
+to use aisdk's text-embedded tool-call fallback.}
+
+\item{disable_stream_options}{Logical or NULL. Whether an OpenAI-compatible
+relay should omit \code{stream_options}. Defaults to TRUE for relays.}
+
+\item{responses_state_mode}{Character or NULL. One of \code{"stateless"},
+\code{"auto"}, or \code{"server"}. Relay endpoints default to
+\code{"stateless"}.}
 }
 \value{
 The model object, invisibly.
 }
 \description{
-Loads \code{.env} (if present), resolves \code{TCM_*} variables, calls
-the matching \code{aisdk::create_*()} function, and registers the model via
-\code{aisdk::set_model()}. All subsequent AI functions then work without
-further setup.
+Loads \code{.env} (if present), resolves \code{TCM_*} variables, creates the
+requested provider, and registers the model via \code{aisdk::set_model()}.
+OpenAI, Anthropic, and Gemini are provided by \pkg{aisdk}; DeepSeek and
+other additional providers are resolved from \pkg{aisdk.providers}.
 }
 \examples{
 \dontrun{
@@ -74,5 +91,14 @@ further setup.
 
   # Override at runtime without touching .env
   tcm_setup("deepseek", api_key = "sk-xxx", model = "deepseek-chat")
+
+  # OpenAI-compatible relay (also works with a relayed DeepSeek model)
+  tcm_setup("deepseek", "sk-xxx", "deepseek-chat",
+            base_url = "https://relay.example.com/v1")
+
+  # Relay implementing the OpenAI Responses API
+  tcm_setup("openai", "sk-xxx", "gpt-5-mini",
+            base_url = "https://relay.example.com/v1",
+            api_format = "responses")
 }
 }

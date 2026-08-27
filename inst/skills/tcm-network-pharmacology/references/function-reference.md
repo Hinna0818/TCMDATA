@@ -1310,6 +1310,8 @@ run_tcm_task(agent, task, model = NULL, verbose = TRUE)
 ```r
 agent <- create_tcm_task_agent()
 result <- run_tcm_task(agent, "Run herb enrichment on Astragalus targets")
+result$tool_calls        # complete calls across all agent steps
+result$generation_result # complete aisdk result
 ```
 
 ### `run_tcm_workflow()`
@@ -1322,6 +1324,10 @@ Usage:
 ```r
 run_tcm_workflow(workflow, ..., verbose = TRUE)
 ```
+
+The returned object remains a positional list of step results. Use
+`attr(result, "tool_calls")` to inspect the complete arguments, result, status,
+and timing recorded for every executed step.
 
 参数解析:
 - `workflow`: A workflow object from create_tcm_workflow.
@@ -1402,6 +1408,10 @@ conversations in the terminal. Each exchange is formatted with clear
 visual structure including routing information, tool call logs, artifact
 updates, and the agent response.
 
+Each turn that executes tools exports a replayable script to `.GlobalEnv`
+using names such as `tcm_script_001`. The session result also records these
+names in `result$scripts` and in the corresponding history entry.
+
 Usage:
 ```r
 tcm_chat(model = NULL, verbose = TRUE, stream = TRUE, skills = NULL)
@@ -1431,13 +1441,23 @@ tcm_chat(skills = c(tcm_skill_dir(), tcm_aisdk_skill()))
 
 Write AI provider credentials to .env
 
-Saves TCM_PROVIDER, TCM_API_KEY, TCM_MODEL, and
-optionally TCM_BASE_URL to a .env file. Existing values for
-these four keys are overwritten; all other lines are preserved.
+Saves provider, model, endpoint, and optional API protocol settings to a
+.env file. Existing TCM_* settings managed by this function are overwritten;
+all other lines are preserved.
 
 Usage:
 ```r
-tcm_config(provider, api_key, model, base_url = NULL, path = ".env")
+tcm_config(
+  provider,
+  api_key,
+  model,
+  base_url = NULL,
+  path = ".env",
+  api_format = NULL,
+  supports_native_tools = NULL,
+  disable_stream_options = NULL,
+  responses_state_mode = NULL
+)
 ```
 
 参数解析:
@@ -1448,15 +1468,23 @@ tcm_config(provider, api_key, model, base_url = NULL, path = ".env")
 - `base_url`: Character or NULL. Override the default API endpoint.
 Required for proxies or self-hosted endpoints.
 - `path`: Character. Path to the .env file. Default ".env".
+- `api_format`: API protocol for a custom endpoint: `chat_completions`,
+`responses`, or `anthropic_messages`.
+- `supports_native_tools`: Whether a relay supports native tool calls.
+- `disable_stream_options`: Whether an OpenAI-compatible relay should omit
+`stream_options`.
+- `responses_state_mode`: `stateless`, `auto`, or `server` for a Responses
+API endpoint.
 
 使用示例:
 ```r
-tcm_config("openai",    "sk-xxx",     "gpt-4o-mini")
-tcm_config("anthropic", "sk-ant-xxx", "claude-3-5-haiku-20241022")
+tcm_config("openai",    "sk-xxx",     "gpt-5-mini")
+tcm_config("anthropic", "sk-ant-xxx", "claude-sonnet-4-20250514")
 tcm_config("gemini",    "AIza-xxx",   "gemini-2.0-flash")
 tcm_config("deepseek",  "sk-xxx",     "deepseek-chat")
-tcm_config("openai",    "sk-xxx",     "gpt-5-minimal",
-base_url = "https://www.packyapi.com/v1")
+tcm_config("anthropic", "relay-key",  "relay-claude-model-id",
+  base_url = "https://relay.example.com/v1",
+  api_format = "chat_completions")
 ```
 
 ### `tcm_field_array()`
@@ -2003,10 +2031,10 @@ res$output$confidence    # one of "high" / "medium" / "low"
 
 Initialise the AI model from .env or explicit arguments
 
-Loads .env (if present), resolves TCM_* variables, calls
-the matching aisdk::create_*() function, and registers the model via
-aisdk::set_model(). All subsequent AI functions then work without
-further setup.
+Loads .env (if present), resolves TCM_* variables, creates the requested
+provider, and registers the model via aisdk::set_model(). OpenAI, Anthropic,
+and Gemini are provided by aisdk; DeepSeek and other additional providers are
+resolved from aisdk.providers.
 
 Usage:
 ```r
@@ -2019,7 +2047,11 @@ base_url = NULL,
 save = FALSE,
 test = FALSE,
 force_json_schema = TRUE,
-skip_internet_check = TRUE
+skip_internet_check = TRUE,
+api_format = NULL,
+supports_native_tools = NULL,
+disable_stream_options = NULL,
+responses_state_mode = NULL
 )
 ```
 
@@ -2049,6 +2081,14 @@ unknown response_format field entirely.
 options(aisdk.skip_internet_check = TRUE) before live requests so
 curl::has_internet() false negatives in proxy/VPN environments do
 not block otherwise reachable API endpoints.
+- `api_format`: Protocol used by a relay endpoint: `chat_completions`,
+`responses`, or `anthropic_messages`.
+- `supports_native_tools`: Whether a relay accepts native tool calls. Set FALSE
+to use the text-embedded fallback.
+- `disable_stream_options`: Whether an OpenAI-compatible relay should omit
+`stream_options`.
+- `responses_state_mode`: Conversation state mode for Responses endpoints;
+relays normally use `stateless`.
 
 使用示例:
 ```r
@@ -2062,8 +2102,18 @@ tcm_setup("openai", "sk-xxx", "gpt-4o-mini", save = TRUE)
 # Verify connectivity after setup
 tcm_setup(test = TRUE)
 
-# Override at runtime without touching .env
+# Official DeepSeek API
+Sys.setenv(DEEPSEEK_BASE_URL = "https://api.deepseek.com")
 tcm_setup("deepseek", api_key = "sk-xxx", model = "deepseek-chat")
+
+# OpenAI-compatible relay serving a Claude model
+tcm_setup(
+  provider = "anthropic",
+  api_key = "relay-key",
+  model = "relay-claude-model-id",
+  base_url = "https://relay.example.com/v1",
+  api_format = "chat_completions"
+)
 ```
 
 ### `tcm_skill_dir()`
